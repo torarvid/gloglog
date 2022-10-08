@@ -17,6 +17,7 @@ type Model struct {
 	cols    []Column
 	rows    []Row
 	cursor  int
+	yOffset int
 	hcursor int
 	focus   bool
 	styles  Styles
@@ -256,9 +257,9 @@ func (m Model) View() string {
 // UpdateViewport updates the list content based on the previously defined
 // columns and rows.
 func (m *Model) UpdateViewport() {
-	renderedRows := make([]string, 0, len(m.rows))
-	for i := range m.rows {
-		renderedRows = append(renderedRows, m.renderRow(i))
+	renderedRows := make([]string, 0, m.viewport.Height)
+	for i := range m.rows[m.yOffset : m.yOffset+m.viewport.Height] {
+		renderedRows = append(renderedRows, m.renderRow(m.yOffset+i))
 	}
 
 	m.viewport.SetContent(
@@ -315,22 +316,22 @@ func (m *Model) SetCursor(n int) {
 // It can not go above the first row.
 func (m *Model) MoveUp(n int) {
 	m.cursor = clamp(m.cursor-n, 0, len(m.rows)-1)
-	m.UpdateViewport()
 
-	if m.cursor < m.viewport.YOffset {
-		m.viewport.SetYOffset(m.cursor)
+	if m.cursor < m.yOffset {
+		m.yOffset = m.cursor
 	}
+	m.UpdateViewport()
 }
 
 // MoveDown moves the selection down by any number of row.
 // It can not go below the last row.
 func (m *Model) MoveDown(n int) {
 	m.cursor = clamp(m.cursor+n, 0, len(m.rows)-1)
-	m.UpdateViewport()
 
-	if m.cursor > (m.viewport.YOffset + (m.viewport.Height - 1)) {
-		m.viewport.SetYOffset(m.cursor - (m.viewport.Height - 1))
+	if m.cursor > (m.yOffset + (m.viewport.Height - 1)) {
+		m.yOffset = m.cursor - (m.viewport.Height - 1)
 	}
+	m.UpdateViewport()
 }
 
 // MoveLeft moves the selection left by any number of columns.
