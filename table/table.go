@@ -14,11 +14,12 @@ import (
 type Model struct {
 	KeyMap KeyMap
 
-	cols   []Column
-	rows   []Row
-	cursor int
-	focus  bool
-	styles Styles
+	cols    []Column
+	rows    []Row
+	cursor  int
+	hcursor int
+	focus   bool
+	styles  Styles
 
 	viewport viewport.Model
 }
@@ -37,6 +38,8 @@ type Column struct {
 type KeyMap struct {
 	LineUp       key.Binding
 	LineDown     key.Binding
+	LineLeft     key.Binding
+	LineRight    key.Binding
 	PageUp       key.Binding
 	PageDown     key.Binding
 	HalfPageUp   key.Binding
@@ -56,6 +59,14 @@ func DefaultKeyMap() KeyMap {
 		LineDown: key.NewBinding(
 			key.WithKeys("down", "j"),
 			key.WithHelp("↓/j", "down"),
+		),
+		LineLeft: key.NewBinding(
+			key.WithKeys("left", "h"),
+			key.WithHelp("←/h", "left"),
+		),
+		LineRight: key.NewBinding(
+			key.WithKeys("right", "l"),
+			key.WithHelp("→/l", "right"),
 		),
 		PageUp: key.NewBinding(
 			key.WithKeys("b", "pgup"),
@@ -195,6 +206,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.MoveUp(1)
 		case key.Matches(msg, m.KeyMap.LineDown):
 			m.MoveDown(1)
+		case key.Matches(msg, m.KeyMap.LineLeft):
+			m.MoveLeft(1)
+		case key.Matches(msg, m.KeyMap.LineRight):
+			m.MoveRight(1)
 		case key.Matches(msg, m.KeyMap.PageUp):
 			m.MoveUp(m.viewport.Height)
 		case key.Matches(msg, m.KeyMap.PageDown):
@@ -318,6 +333,20 @@ func (m *Model) MoveDown(n int) {
 	}
 }
 
+// MoveLeft moves the selection left by any number of columns.
+// It can not go left of the first column.
+func (m *Model) MoveLeft(n int) {
+	m.hcursor = clamp(m.hcursor-n, 0, len(m.cols)-1)
+	m.UpdateViewport()
+}
+
+// MoveRight moves the selection right by any number of columns.
+// It can not go right of the last column.
+func (m *Model) MoveRight(n int) {
+	m.hcursor = clamp(m.hcursor+n, 0, len(m.cols)-1)
+	m.UpdateViewport()
+}
+
 // GotoTop moves the selection to the first row.
 func (m *Model) GotoTop() {
 	m.MoveUp(m.cursor)
@@ -346,7 +375,10 @@ func (m *Model) FromValues(value, separator string) {
 
 func (m Model) headersView() string {
 	var s = make([]string, 0, len(m.cols))
-	for _, col := range m.cols {
+	for i, col := range m.cols {
+		if i < m.hcursor {
+			continue
+		}
 		style := lipgloss.NewStyle().Width(col.Width).MaxWidth(col.Width).Inline(true)
 		renderedCell := style.Render(runewidth.Truncate(col.Title, col.Width, "…"))
 		s = append(s, m.styles.Header.Render(renderedCell))
@@ -357,6 +389,9 @@ func (m Model) headersView() string {
 func (m *Model) renderRow(rowID int) string {
 	var s = make([]string, 0, len(m.cols))
 	for i, value := range m.rows[rowID] {
+		if i < m.hcursor {
+			continue
+		}
 		style := lipgloss.NewStyle().Width(m.cols[i].Width).MaxWidth(m.cols[i].Width).Inline(true)
 		renderedCell := m.styles.Cell.Render(style.Render(runewidth.Truncate(value, m.cols[i].Width, "…")))
 		s = append(s, renderedCell)
