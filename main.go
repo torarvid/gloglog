@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
@@ -17,7 +18,7 @@ var baseStyle = lipgloss.NewStyle().
 	BorderForeground(lipgloss.Color("240"))
 
 type model struct {
-	table table.Model
+	table table.Model[string]
 }
 
 func (m model) Init() tea.Cmd { return nil }
@@ -48,6 +49,46 @@ func (m model) View() string {
 	return baseStyle.Render(m.table.View()) + "\n"
 }
 
+type Column struct {
+	title       string
+	width       int
+	valueGetter func(string) string
+}
+
+func (c *Column) Title() string {
+	return c.title
+}
+
+func (c *Column) Width() int {
+	return c.width
+}
+
+func (c *Column) SetWidth(width int) {
+	c.width = width
+}
+
+func (c *Column) GetValue(s string) string {
+	return c.valueGetter(s)
+}
+
+func timestampGetter(s string) string {
+	var js map[string]any
+	err := json.Unmarshal([]byte(s), &js)
+	ts := ""
+	if err == nil {
+		ts = js["timestamp"].(string)
+	}
+	t, err := time.Parse(time.RFC3339, ts)
+	if err != nil {
+		return "Invalid"
+	}
+	return t.Format("15:04:05.000")
+}
+
+func identity(s string) string {
+	return s
+}
+
 func main() {
 	f, err := os.OpenFile("log.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -55,9 +96,9 @@ func main() {
 	}
 	log.SetOutput(f)
 
-	columns := []table.Column{
-		{Title: "Time", Width: 35},
-		{Title: "All", Width: 100},
+	columns := []table.ColumnSpec[string]{
+		&Column{title: "Time", width: 35, valueGetter: timestampGetter},
+		&Column{title: "All", width: 100, valueGetter: identity},
 	}
 
 	file, err := os.Open("test_download_loki.log")
@@ -67,23 +108,16 @@ func main() {
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
-	rows := make([]table.Row, 0)
+	rows := make([]string, 0)
 	for scanner.Scan() {
-		text := scanner.Text()
-		var js map[string]any
-		err := json.Unmarshal([]byte(text), &js)
-		time := ""
-		if err == nil {
-			time = js["timestamp"].(string)
-		}
-		rows = append(rows, table.Row{time, text})
+		rows = append(rows, scanner.Text())
 	}
 
 	t := table.New(
 		table.WithColumns(columns),
 		table.WithRows(rows),
-		table.WithFocused(true),
-		table.WithHeight(27),
+		table.WithFocused[string](true),
+		table.WithHeight[string](27),
 	)
 
 	s := table.DefaultStyles()
@@ -99,7 +133,7 @@ func main() {
 	t.SetStyles(s)
 
 	m := model{t}
-	if err := tea.NewProgram(m).Start(); err != nil {
+	if err := tea.NewProgram(m, tea.WithAltScreen()).Start(); err != nil {
 		fmt.Println("Error running program:", err)
 		os.Exit(1)
 	}
