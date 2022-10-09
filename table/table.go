@@ -1,8 +1,6 @@
 package table
 
 import (
-	"strings"
-
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -10,12 +8,12 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
-// Model defines a state for the table widget.
-type Model struct {
+// Model[E] defines a state for the table widget.
+type Model[E any] struct {
 	KeyMap KeyMap
 
-	cols    []Column
-	rows    []Row
+	cols    []ColumnSpec[E]
+	rows    []E
 	cursor  int
 	yOffset int
 	hcursor int
@@ -26,12 +24,13 @@ type Model struct {
 }
 
 // Row represents one line in the table.
-type Row []string
+// type Row string
 
-// Column defines the table structure.
-type Column struct {
-	Title string
-	Width int
+type ColumnSpec[E any] interface {
+	Title() string
+	Width() int
+	SetWidth(int)
+	GetValue(E) string
 }
 
 // KeyMap defines keybindings. It satisfies to the help.KeyMap interface, which
@@ -47,6 +46,8 @@ type KeyMap struct {
 	HalfPageDown key.Binding
 	GotoTop      key.Binding
 	GotoBottom   key.Binding
+	ShrinkColumn key.Binding
+	GrowColumn   key.Binding
 }
 
 // DefaultKeyMap returns a default set of keybindings.
@@ -93,6 +94,14 @@ func DefaultKeyMap() KeyMap {
 			key.WithKeys("end", "G"),
 			key.WithHelp("G/end", "go to end"),
 		),
+		ShrinkColumn: key.NewBinding(
+			key.WithKeys("ctrl+left", "ctrl+h"),
+			key.WithHelp("ctrl+←/ctrl+h", "shrink column"),
+		),
+		GrowColumn: key.NewBinding(
+			key.WithKeys("ctrl+right", "ctrl+l"),
+			key.WithHelp("ctrl+→/ctrl+l", "grow column"),
+		),
 	}
 }
 
@@ -114,19 +123,19 @@ func DefaultStyles() Styles {
 }
 
 // SetStyles sets the table styles.
-func (m *Model) SetStyles(s Styles) {
+func (m *Model[E]) SetStyles(s Styles) {
 	m.styles = s
 	m.UpdateViewport()
 }
 
-// Option is used to set options in New. For example:
+// Option[E] is used to set options in New. For example:
 //
 //	table := New(WithColumns([]Column{{Title: "ID", Width: 10}}))
-type Option func(*Model)
+type Option[E any] func(*Model[E])
 
 // New creates a new model for the table widget.
-func New(opts ...Option) Model {
-	m := Model{
+func New[E any](opts ...Option[E]) Model[E] {
+	m := Model[E]{
 		cursor:   0,
 		viewport: viewport.New(0, 20),
 
@@ -144,56 +153,56 @@ func New(opts ...Option) Model {
 }
 
 // WithColumns sets the table columns (headers).
-func WithColumns(cols []Column) Option {
-	return func(m *Model) {
+func WithColumns[E any](cols []ColumnSpec[E]) Option[E] {
+	return func(m *Model[E]) {
 		m.cols = cols
 	}
 }
 
 // WithRows sets the table rows (data).
-func WithRows(rows []Row) Option {
-	return func(m *Model) {
+func WithRows[E any](rows []E) Option[E] {
+	return func(m *Model[E]) {
 		m.rows = rows
 	}
 }
 
 // WithHeight sets the height of the table.
-func WithHeight(h int) Option {
-	return func(m *Model) {
+func WithHeight[E any](h int) Option[E] {
+	return func(m *Model[E]) {
 		m.viewport.Height = h
 	}
 }
 
 // WithWidth sets the width of the table.
-func WithWidth(w int) Option {
-	return func(m *Model) {
+func WithWidth[E any](w int) Option[E] {
+	return func(m *Model[E]) {
 		m.viewport.Width = w
 	}
 }
 
 // WithFocused sets the focus state of the table.
-func WithFocused(f bool) Option {
-	return func(m *Model) {
+func WithFocused[E any](f bool) Option[E] {
+	return func(m *Model[E]) {
 		m.focus = f
 	}
 }
 
 // WithStyles sets the table styles.
-func WithStyles(s Styles) Option {
-	return func(m *Model) {
+func WithStyles[E any](s Styles) Option[E] {
+	return func(m *Model[E]) {
 		m.styles = s
 	}
 }
 
 // WithKeyMap sets the key map.
-func WithKeyMap(km KeyMap) Option {
-	return func(m *Model) {
+func WithKeyMap[E any](km KeyMap) Option[E] {
+	return func(m *Model[E]) {
 		m.KeyMap = km
 	}
 }
 
 // Update is the Bubble Tea update loop.
-func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
+func (m Model[E]) Update(msg tea.Msg) (Model[E], tea.Cmd) {
 	if !m.focus {
 		return m, nil
 	}
@@ -225,6 +234,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.GotoTop()
 		case key.Matches(msg, m.KeyMap.GotoBottom):
 			m.GotoBottom()
+		case key.Matches(msg, m.KeyMap.ShrinkColumn):
+			m.ShrinkColumn()
+		case key.Matches(msg, m.KeyMap.GrowColumn):
+			m.GrowColumn()
 		}
 	}
 
@@ -232,31 +245,31 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 }
 
 // Focused returns the focus state of the table.
-func (m Model) Focused() bool {
+func (m Model[E]) Focused() bool {
 	return m.focus
 }
 
 // Focus focusses the table, allowing the user to move around the rows and
 // interact.
-func (m *Model) Focus() {
+func (m *Model[E]) Focus() {
 	m.focus = true
 	m.UpdateViewport()
 }
 
 // Blur blurs the table, preventing selection or movement.
-func (m *Model) Blur() {
+func (m *Model[E]) Blur() {
 	m.focus = false
 	m.UpdateViewport()
 }
 
 // View renders the component.
-func (m Model) View() string {
+func (m Model[E]) View() string {
 	return m.headersView() + "\n" + m.viewport.View()
 }
 
 // UpdateViewport updates the list content based on the previously defined
 // columns and rows.
-func (m *Model) UpdateViewport() {
+func (m *Model[E]) UpdateViewport() {
 	renderedRows := make([]string, 0, m.viewport.Height)
 	for i := range m.rows[m.yOffset : m.yOffset+m.viewport.Height] {
 		renderedRows = append(renderedRows, m.renderRow(m.yOffset+i))
@@ -269,52 +282,52 @@ func (m *Model) UpdateViewport() {
 
 // SelectedRow returns the selected row.
 // You can cast it to your own implementation.
-func (m Model) SelectedRow() Row {
+func (m Model[E]) SelectedRow() E {
 	return m.rows[m.cursor]
 }
 
 // SetRows set a new rows state.
-func (m *Model) SetRows(r []Row) {
+func (m *Model[E]) SetRows(r []E) {
 	m.rows = r
 	m.UpdateViewport()
 }
 
 // SetWidth sets the width of the viewport of the table.
-func (m *Model) SetWidth(w int) {
+func (m *Model[E]) SetWidth(w int) {
 	m.viewport.Width = w
 	m.UpdateViewport()
 }
 
 // SetHeight sets the height of the viewport of the table.
-func (m *Model) SetHeight(h int) {
+func (m *Model[E]) SetHeight(h int) {
 	m.viewport.Height = h
 	m.UpdateViewport()
 }
 
 // Height returns the viewport height of the table.
-func (m Model) Height() int {
+func (m Model[E]) Height() int {
 	return m.viewport.Height
 }
 
 // Width returns the viewport width of the table.
-func (m Model) Width() int {
+func (m Model[E]) Width() int {
 	return m.viewport.Width
 }
 
 // Cursor returns the index of the selected row.
-func (m Model) Cursor() int {
+func (m Model[E]) Cursor() int {
 	return m.cursor
 }
 
 // SetCursor sets the cursor position in the table.
-func (m *Model) SetCursor(n int) {
+func (m *Model[E]) SetCursor(n int) {
 	m.cursor = clamp(n, 0, len(m.rows)-1)
 	m.UpdateViewport()
 }
 
 // MoveUp moves the selection up by any number of row.
 // It can not go above the first row.
-func (m *Model) MoveUp(n int) {
+func (m *Model[E]) MoveUp(n int) {
 	m.cursor = clamp(m.cursor-n, 0, len(m.rows)-1)
 
 	if m.cursor < m.yOffset {
@@ -325,7 +338,7 @@ func (m *Model) MoveUp(n int) {
 
 // MoveDown moves the selection down by any number of row.
 // It can not go below the last row.
-func (m *Model) MoveDown(n int) {
+func (m *Model[E]) MoveDown(n int) {
 	m.cursor = clamp(m.cursor+n, 0, len(m.rows)-1)
 
 	if m.cursor > (m.yOffset + (m.viewport.Height - 1)) {
@@ -336,65 +349,67 @@ func (m *Model) MoveDown(n int) {
 
 // MoveLeft moves the selection left by any number of columns.
 // It can not go left of the first column.
-func (m *Model) MoveLeft(n int) {
+func (m *Model[E]) MoveLeft(n int) {
 	m.hcursor = clamp(m.hcursor-n, 0, len(m.cols)-1)
 	m.UpdateViewport()
 }
 
 // MoveRight moves the selection right by any number of columns.
 // It can not go right of the last column.
-func (m *Model) MoveRight(n int) {
+func (m *Model[E]) MoveRight(n int) {
 	m.hcursor = clamp(m.hcursor+n, 0, len(m.cols)-1)
 	m.UpdateViewport()
 }
 
 // GotoTop moves the selection to the first row.
-func (m *Model) GotoTop() {
+func (m *Model[E]) GotoTop() {
 	m.MoveUp(m.cursor)
 }
 
 // GotoBottom moves the selection to the last row.
-func (m *Model) GotoBottom() {
+func (m *Model[E]) GotoBottom() {
 	m.MoveDown(len(m.rows))
 }
 
-// FromValues create the table rows from a simple string. It uses `\n` by
-// default for getting all the rows and the given separator for the fields on
-// each row.
-func (m *Model) FromValues(value, separator string) {
-	rows := []Row{}
-	for _, line := range strings.Split(value, "\n") {
-		r := Row{}
-		for _, field := range strings.Split(line, separator) {
-			r = append(r, field)
-		}
-		rows = append(rows, r)
-	}
-
-	m.SetRows(rows)
+// ShrinkColumn shrinks the current column by one character.
+func (m *Model[E]) ShrinkColumn() {
+	m.cols[m.hcursor].SetWidth(m.cols[m.hcursor].Width() - 1)
+	m.UpdateViewport()
 }
 
-func (m Model) headersView() string {
+// GrowColumn grows the current column by one character.
+func (m *Model[E]) GrowColumn() {
+	m.cols[m.hcursor].SetWidth(m.cols[m.hcursor].Width() + 1)
+	m.UpdateViewport()
+}
+
+func (m Model[E]) headersView() string {
 	var s = make([]string, 0, len(m.cols))
 	for i, col := range m.cols {
 		if i < m.hcursor {
 			continue
 		}
-		style := lipgloss.NewStyle().Width(col.Width).MaxWidth(col.Width).Inline(true)
-		renderedCell := style.Render(runewidth.Truncate(col.Title, col.Width, "…"))
+		style := lipgloss.NewStyle().Width(col.Width()).MaxWidth(col.Width()).Inline(true)
+		renderedCell := style.Render(runewidth.Truncate(col.Title(), col.Width(), "…"))
 		s = append(s, m.styles.Header.Render(renderedCell))
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Left, s...)
 }
 
-func (m *Model) renderRow(rowID int) string {
+func (m *Model[E]) renderRow(rowID int) string {
 	var s = make([]string, 0, len(m.cols))
-	for i, value := range m.rows[rowID] {
+	for i, col := range m.cols {
 		if i < m.hcursor {
 			continue
 		}
-		style := lipgloss.NewStyle().Width(m.cols[i].Width).MaxWidth(m.cols[i].Width).Inline(true)
-		renderedCell := m.styles.Cell.Render(style.Render(runewidth.Truncate(value, m.cols[i].Width, "…")))
+		row := m.rows[rowID]
+		style := lipgloss.NewStyle().
+			Width(m.cols[i].Width()).
+			MaxWidth(m.cols[i].Width()).
+			Inline(true)
+		value := col.GetValue(row)
+		content := style.Render(runewidth.Truncate(value, m.cols[i].Width(), "…"))
+		renderedCell := m.styles.Cell.Render(content)
 		s = append(s, renderedCell)
 	}
 
