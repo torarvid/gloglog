@@ -4,12 +4,15 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/pelletier/go-toml/v2"
+	"github.com/tidwall/gjson"
 	"github.com/torarvid/gloglog/table"
 )
 
@@ -39,7 +42,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 
 	case tea.WindowSizeMsg:
-		m.table.SetWidth(msg.Width)
+		m.table.SetWidth(msg.Width - 2)
+		m.table.SetHeight(msg.Height - 5)
 	}
 	m.table, cmd = m.table.Update(msg)
 	return m, cmd
@@ -89,6 +93,43 @@ func identity(s string) string {
 	return s
 }
 
+func getValueFromPath(path, typ string, format *string) func(string) string {
+	if path == "." {
+		return identity
+	}
+	return func(s string) string {
+		val := gjson.Get(s, path)
+		str := val.String()
+		switch typ {
+		case "time":
+			t, err := time.Parse(time.RFC3339, str)
+			if err != nil {
+				return "Invalid"
+			}
+			if format == nil {
+				return t.Format(time.StampMilli)
+			}
+			return t.Format(*format)
+		default:
+			return str
+		}
+	}
+}
+
+func loadConfig() Config {
+	configString, err := ioutil.ReadFile("foo.toml")
+	if err != nil {
+		panic(err)
+	}
+
+	var config Config
+	err = toml.Unmarshal([]byte(configString), &config)
+	if err != nil {
+		panic(err)
+	}
+	return config
+}
+
 func main() {
 	f, err := os.OpenFile("log.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -96,12 +137,22 @@ func main() {
 	}
 	log.SetOutput(f)
 
-	columns := []table.ColumnSpec[string]{
-		&Column{title: "Time", width: 35, valueGetter: timestampGetter},
-		&Column{title: "All", width: 100, valueGetter: identity},
+	config := loadConfig()
+	search := config.SavedSearches[0]
+	columns := make([]table.ColumnSpec[string], len(search.Columns))
+	for i, c := range search.Columns {
+		columns[i] = &Column{
+			title:       c.Name,
+			width:       c.Width,
+			valueGetter: getValueFromPath(c.Path, c.Type, c.Format),
+		}
 	}
 
-	file, err := os.Open("test_download_loki.log")
+	filename, exists := search.Options["filename"]
+	if !exists {
+		panic("filename not found")
+	}
+	file, err := os.Open(filename)
 	if err != nil {
 		log.Fatal(err)
 	}
