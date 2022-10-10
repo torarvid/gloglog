@@ -12,9 +12,9 @@ type SavedSearch struct {
 }
 
 type SearchColumn struct {
-	Name   string
-	Width  int
-	Path   string
-	Type   string
-	Format *string
+	Name     string
+	Width    int
+	Selector string
+	Type     string
+	Format   *string
 }
