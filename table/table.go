@@ -384,12 +384,17 @@ func (m *Model[E]) GrowColumn() {
 
 func (m Model[E]) headersView() string {
 	var s = make([]string, 0, len(m.cols))
+	remainingWidth := m.Width()
+	padding := m.styles.Header.GetHorizontalPadding()
 	for i, col := range m.cols {
 		if i < m.hcursor {
 			continue
 		}
-		style := lipgloss.NewStyle().Width(col.Width()).MaxWidth(col.Width()).Inline(true)
-		renderedCell := style.Render(runewidth.Truncate(col.Title(), col.Width(), "…"))
+		colWidthWithPadding := min(col.Width()+padding, remainingWidth)
+		remainingWidth -= colWidthWithPadding
+		colWidth := colWidthWithPadding - padding
+		style := lipgloss.NewStyle().Width(colWidth).MaxWidth(colWidth).Inline(true)
+		renderedCell := style.Render(runewidth.Truncate(col.Title(), colWidth, "…"))
 		s = append(s, m.styles.Header.Render(renderedCell))
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Left, s...)
@@ -397,17 +402,22 @@ func (m Model[E]) headersView() string {
 
 func (m *Model[E]) renderRow(rowID int) string {
 	var s = make([]string, 0, len(m.cols))
+	remainingWidth := m.Width()
+	padding := m.styles.Cell.GetHorizontalPadding()
 	for i, col := range m.cols {
 		if i < m.hcursor {
 			continue
 		}
 		row := m.rows[rowID]
+		colWidthWithPadding := min(col.Width()+padding, remainingWidth)
+		remainingWidth -= colWidthWithPadding
+		colWidth := colWidthWithPadding - padding
 		style := lipgloss.NewStyle().
-			Width(m.cols[i].Width()).
-			MaxWidth(m.cols[i].Width()).
+			Width(colWidth).
+			MaxWidth(colWidth).
 			Inline(true)
 		value := col.GetValue(row)
-		content := style.Render(runewidth.Truncate(value, m.cols[i].Width(), "…"))
+		content := style.Render(runewidth.Truncate(value, colWidth, "…"))
 		renderedCell := m.styles.Cell.Render(content)
 		s = append(s, renderedCell)
 	}
