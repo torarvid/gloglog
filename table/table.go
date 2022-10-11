@@ -393,6 +393,9 @@ func (m Model[E]) headersView() string {
 		colWidthWithPadding := min(col.Width()+padding, remainingWidth)
 		remainingWidth -= colWidthWithPadding
 		colWidth := colWidthWithPadding - padding
+		if colWidth < 1 {
+			continue
+		}
 		style := lipgloss.NewStyle().Width(colWidth).MaxWidth(colWidth).Inline(true)
 		renderedCell := style.Render(runewidth.Truncate(col.Title(), colWidth, "…"))
 		s = append(s, m.styles.Header.Render(renderedCell))
@@ -412,6 +415,9 @@ func (m *Model[E]) renderRow(rowID int) string {
 		colWidthWithPadding := min(col.Width()+padding, remainingWidth)
 		remainingWidth -= colWidthWithPadding
 		colWidth := colWidthWithPadding - padding
+		if colWidth < 1 {
+			continue
+		}
 		style := lipgloss.NewStyle().
 			Width(colWidth).
 			MaxWidth(colWidth).
