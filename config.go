@@ -1,17 +1,17 @@
 package main
 
 type Config struct {
-	SavedSearches []SavedSearch
+	SavedViews []LogView
 }
 
-type SavedSearch struct {
+type LogView struct {
 	Name     string
 	SourceId string
 	Options  map[string]string
-	Columns  []SearchColumn
+	Attrs    []Attribute
 }
 
-type SearchColumn struct {
+type Attribute struct {
 	Name     string
 	Width    int
 	Selector string

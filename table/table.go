@@ -270,8 +270,9 @@ func (m Model[E]) View() string {
 // columns and rows.
 func (m *Model[E]) UpdateViewport() {
 	renderedRows := make([]string, 0, m.viewport.Height)
-	for i := range m.rows[m.yOffset : m.yOffset+m.viewport.Height] {
-		renderedRows = append(renderedRows, m.renderRow(m.yOffset+i))
+	start, end := m.yOffset, min(m.yOffset+m.viewport.Height, len(m.rows))
+	for i := range m.rows[start:end] {
+		renderedRows = append(renderedRows, m.renderRow(start+i))
 	}
 
 	m.viewport.SetContent(

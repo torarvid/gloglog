@@ -32,9 +32,9 @@ func main() {
 	log.SetOutput(f)
 
 	config := loadConfig()
-	search := config.SavedSearches[0]
+	view := config.SavedViews[0]
 
-	m := newModel(search)
+	m := newModel(view)
 	if err := tea.NewProgram(m, tea.WithAltScreen()).Start(); err != nil {
 		fmt.Println("Error running program:", err)
 		os.Exit(1)

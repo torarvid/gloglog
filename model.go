@@ -24,18 +24,24 @@ const (
 	stateSearch
 )
 
+var stateOverlays []int = []int{stateZoomRow, stateSearch}
+
 type model struct {
-	table table.Model[string]
-	state int
+	table        table.Model[string]
+	rows         []string
+	filteredRows []string
+	view         LogView
+	filters      []RowFilter
+	state        int
 }
 
-func newModel(search SavedSearch) *model {
-	columns := make([]table.ColumnSpec[string], len(search.Columns))
-	for i, c := range search.Columns {
+func newModel(logView LogView) *model {
+	columns := make([]table.ColumnSpec[string], len(logView.Attrs))
+	for i, c := range logView.Attrs {
 		columns[i] = ColumnFromConfig(c)
 	}
 
-	filename, exists := search.Options["filename"]
+	filename, exists := logView.Options["filename"]
 	if !exists {
 		panic("filename not found")
 	}
@@ -53,7 +59,6 @@ func newModel(search SavedSearch) *model {
 
 	t := table.New(
 		table.WithColumns(columns),
-		table.WithRows(rows),
 		table.WithFocused[string](true),
 		table.WithHeight[string](27),
 	)
@@ -70,7 +75,19 @@ func newModel(search SavedSearch) *model {
 		Bold(false)
 	t.SetStyles(s)
 
-	return &model{table: t, state: stateTable}
+	m := &model{
+		table: t, state: stateTable, rows: rows, view: logView, filters: make([]RowFilter, 0),
+	}
+	m.AddFilters(RowFilter(func(s string) bool {
+		return strings.Contains(s, "PalletizeToteOrder")
+	}))
+	return m
+}
+
+type RowFilter func(string) bool
+
+func (rf RowFilter) Filter(s string) bool {
+	return rf(s)
 }
 
 func (m model) Init() tea.Cmd { return nil }
@@ -80,20 +97,20 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
+		case " ":
+			if m.state == stateTable {
+				m.state = stateZoomRow
+			}
+		case "/":
+			if m.state == stateTable {
+				m.state = stateSearch
+			}
 		case "esc":
-			if m.table.Focused() {
-				m.table.Blur()
-			} else {
-				m.table.Focus()
+			if contains(stateOverlays, m.state) {
+				m.state = stateTable
 			}
 		case "q", "ctrl+c":
 			return m, tea.Quit
-		case " ":
-			if m.state == stateZoomRow {
-				m.state = stateTable
-			} else {
-				m.state = stateZoomRow
-			}
 		}
 
 	case tea.WindowSizeMsg:
@@ -120,8 +137,29 @@ func (m model) View() string {
 		}
 		return baseStyle.Render(string(rendered))
 
+	case stateSearch:
+		return ""
+
 	default:
 		panic("Unknown state")
+	}
+}
+
+func (m *model) AddFilters(fs ...RowFilter) {
+	m.filters = append(m.filters, fs...)
+	m.updateFilteredRows()
+	m.table.SetRows(m.filteredRows)
+}
+
+func (m *model) updateFilteredRows() {
+	m.filteredRows = make([]string, 0, len(m.rows)/10)
+	for _, row := range m.rows {
+		for _, filter := range m.filters {
+			if !filter.Filter(row) {
+				continue
+			}
+		}
+		m.filteredRows = append(m.filteredRows, row)
 	}
 }
 
@@ -131,7 +169,7 @@ type Column struct {
 	valueGetter func(string) string
 }
 
-func ColumnFromConfig(c SearchColumn) *Column {
+func ColumnFromConfig(c Attribute) *Column {
 	return &Column{
 		title:       c.Name,
 		width:       c.Width,
