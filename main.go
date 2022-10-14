@@ -1,23 +1,22 @@
 package main
 
 import (
-	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/pelletier/go-toml/v2"
+	"github.com/torarvid/gloglog/config"
 )
 
-func loadConfig() Config {
-	configString, err := ioutil.ReadFile("foo.toml")
+func loadConfig() config.Config {
+	configBytes, err := os.ReadFile("foo.toml")
 	if err != nil {
 		panic(err)
 	}
 
-	var config Config
-	err = toml.Unmarshal([]byte(configString), &config)
+	var config config.Config
+	err = toml.Unmarshal(configBytes, &config)
 	if err != nil {
 		panic(err)
 	}
@@ -36,7 +35,7 @@ func main() {
 
 	m := newModel(view)
 	if err := tea.NewProgram(m, tea.WithAltScreen()).Start(); err != nil {
-		fmt.Println("Error running program:", err)
+		log.Println("Error running program:", err)
 		os.Exit(1)
 	}
 }

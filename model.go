@@ -11,6 +11,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/tidwall/gjson"
+	"github.com/torarvid/gloglog/config"
 	"github.com/torarvid/gloglog/table"
 )
 
@@ -21,21 +22,24 @@ var baseStyle = lipgloss.NewStyle().
 const (
 	stateTable = iota
 	stateZoomRow
+	stateSchema
 	stateSearch
 )
 
-var stateOverlays []int = []int{stateZoomRow, stateSearch}
+var stateOverlays []int = []int{stateZoomRow, stateSchema, stateSearch}
 
 type model struct {
 	table        table.Model[string]
 	rows         []string
 	filteredRows []string
-	view         LogView
+	view         config.LogView
 	filters      []RowFilter
 	state        int
+	termWidth    int
+	termHeight   int
 }
 
-func newModel(logView LogView) *model {
+func newModel(logView config.LogView) *model {
 	columns := make([]table.ColumnSpec[string], len(logView.Attrs))
 	for i, c := range logView.Attrs {
 		columns[i] = ColumnFromConfig(c)
@@ -101,6 +105,10 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if m.state == stateTable {
 				m.state = stateZoomRow
 			}
+		case "s":
+			if m.state == stateTable {
+				m.state = stateSchema
+			}
 		case "/":
 			if m.state == stateTable {
 				m.state = stateSearch
@@ -116,6 +124,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.table.SetWidth(msg.Width - 2)
 		m.table.SetHeight(msg.Height - 5)
+		m.termWidth, m.termHeight = msg.Width, msg.Height
 	}
 	m.table, cmd = m.table.Update(msg)
 	return m, cmd
@@ -130,12 +139,18 @@ func (m model) View() string {
 	case stateZoomRow:
 		rawRow := m.table.SelectedRow()
 		var row map[string]interface{}
-		json.Unmarshal([]byte(rawRow), &row)
+		err := json.Unmarshal([]byte(rawRow), &row)
+		if err != nil {
+			return "Invalid"
+		}
 		rendered, err := json.MarshalIndent(row, "", "    ")
 		if err != nil {
 			return "Invalid"
 		}
-		return baseStyle.Render(string(rendered))
+		return baseStyle.Width(m.termWidth - 2).Render(string(rendered))
+
+	case stateSchema:
+		return ""
 
 	case stateSearch:
 		return ""
@@ -169,7 +184,7 @@ type Column struct {
 	valueGetter func(string) string
 }
 
-func ColumnFromConfig(c Attribute) *Column {
+func ColumnFromConfig(c config.Attribute) *Column {
 	return &Column{
 		title:       c.Name,
 		width:       c.Width,
