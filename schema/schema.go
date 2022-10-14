@@ -1,4 +1,4 @@
-package attrs
+package schema
 
 import (
 	tea "github.com/charmbracelet/bubbletea"

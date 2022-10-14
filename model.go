@@ -12,6 +12,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/tidwall/gjson"
 	"github.com/torarvid/gloglog/config"
+	"github.com/torarvid/gloglog/schema"
 	"github.com/torarvid/gloglog/table"
 )
 
@@ -30,6 +31,7 @@ var stateOverlays []int = []int{stateZoomRow, stateSchema, stateSearch}
 
 type model struct {
 	table        table.Model[string]
+	schema       schema.Model
 	rows         []string
 	filteredRows []string
 	view         config.LogView
@@ -80,7 +82,12 @@ func newModel(logView config.LogView) *model {
 	t.SetStyles(s)
 
 	m := &model{
-		table: t, state: stateTable, rows: rows, view: logView, filters: make([]RowFilter, 0),
+		table:   t,
+		state:   stateTable,
+		rows:    rows,
+		view:    logView,
+		filters: make([]RowFilter, 0),
+		schema:  schema.FromLogView(logView),
 	}
 	m.AddFilters(RowFilter(func(s string) bool {
 		return strings.Contains(s, "PalletizeToteOrder")
@@ -117,7 +124,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			if contains(stateOverlays, m.state) {
 				m.state = stateTable
 			}
-		case "q", "ctrl+c":
+		case "q":
+			if m.state == stateTable {
+				return m, tea.Quit
+			}
+		case "ctrl+c":
 			return m, tea.Quit
 		}
 
@@ -126,7 +137,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.table.SetHeight(msg.Height - 5)
 		m.termWidth, m.termHeight = msg.Width, msg.Height
 	}
-	m.table, cmd = m.table.Update(msg)
+	switch m.state {
+	case stateTable:
+		m.table, cmd = m.table.Update(msg)
+	case stateSchema:
+		m.schema, cmd = m.schema.Update(msg)
+	}
 	return m, cmd
 }
 
@@ -150,7 +166,7 @@ func (m model) View() string {
 		return baseStyle.Width(m.termWidth - 2).Render(string(rendered))
 
 	case stateSchema:
-		return ""
+		return baseStyle.Render(m.schema.View())
 
 	case stateSearch:
 		return ""
