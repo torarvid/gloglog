@@ -87,7 +87,7 @@ func newModel(logView config.LogView) *model {
 		rows:    rows,
 		view:    logView,
 		filters: make([]RowFilter, 0),
-		schema:  schema.FromLogView(logView),
+		schema:  schema.FromLogView(logView, 1, 1),
 	}
 	m.AddFilters(RowFilter(func(s string) bool {
 		return strings.Contains(s, "PalletizeToteOrder")
@@ -104,6 +104,7 @@ func (rf RowFilter) Filter(s string) bool {
 func (m model) Init() tea.Cmd { return nil }
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	cmds := make([]tea.Cmd, 0)
 	var cmd tea.Cmd
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
@@ -131,19 +132,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			return m, tea.Quit
 		}
+		switch m.state {
+		case stateTable:
+			m.table, cmd = m.table.Update(msg)
+			cmds = append(cmds, cmd)
+		case stateSchema:
+			m.schema, cmd = m.schema.Update(msg)
+			cmds = append(cmds, cmd)
+		}
 
 	case tea.WindowSizeMsg:
-		m.table.SetWidth(msg.Width - 2)
-		m.table.SetHeight(msg.Height - 5)
+		m.table, cmd = m.table.Update(msg)
+		cmds = append(cmds, cmd)
+		m.schema, cmd = m.schema.Update(msg)
+		cmds = append(cmds, cmd)
 		m.termWidth, m.termHeight = msg.Width, msg.Height
 	}
-	switch m.state {
-	case stateTable:
-		m.table, cmd = m.table.Update(msg)
-	case stateSchema:
-		m.schema, cmd = m.schema.Update(msg)
-	}
-	return m, cmd
+	return m, tea.Batch(cmds...)
 }
 
 func (m model) View() string {
@@ -166,6 +171,7 @@ func (m model) View() string {
 		return baseStyle.Width(m.termWidth - 2).Render(string(rendered))
 
 	case stateSchema:
+		m.schema.Update(tea.WindowSizeMsg{Width: m.termWidth, Height: m.termHeight})
 		return baseStyle.Render(m.schema.View())
 
 	case stateSearch:

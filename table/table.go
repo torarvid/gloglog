@@ -238,6 +238,9 @@ func (m Model[E]) Update(msg tea.Msg) (Model[E], tea.Cmd) {
 		case key.Matches(msg, m.KeyMap.GrowColumn):
 			m.GrowColumn()
 		}
+	case tea.WindowSizeMsg:
+		m.SetWidth(msg.Width - 2)
+		m.SetHeight(msg.Height - 5)
 	}
 
 	return m, tea.Batch(cmds...)
