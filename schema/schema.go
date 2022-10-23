@@ -83,12 +83,15 @@ func FromLogView(lv config.LogView, width, height int) Model {
 	l.Styles.Title = titleStyle
 	l.Styles.PaginationStyle = paginationStyle
 	l.Styles.HelpStyle = helpStyle
+	l.DisableQuitKeybindings()
 	return Model{Attributes: attrs, list: l}
 }
 
 func (m Model) Init() tea.Cmd {
 	return nil
 }
+
+type Close struct{}
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	cmds := make([]tea.Cmd, 0)
@@ -103,8 +106,17 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			attr, ok := m.list.SelectedItem().(Attribute)
 			if ok {
 				m.selected = &attr
+				m.list.KeyMap.CursorDown.SetEnabled(false)
+				m.list.KeyMap.CursorUp.SetEnabled(false)
 			}
 			return m, nil
+		case "esc":
+			if m.selected == nil {
+				return m, func() tea.Msg { return Close{} }
+			}
+			m.selected = nil
+			m.list.KeyMap.CursorDown.SetEnabled(true)
+			m.list.KeyMap.CursorUp.SetEnabled(true)
 		}
 	}
 

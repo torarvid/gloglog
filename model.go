@@ -106,39 +106,45 @@ func (m model) Init() tea.Cmd { return nil }
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	cmds := make([]tea.Cmd, 0)
 	var cmd tea.Cmd
+	switch m.state {
+	case stateTable:
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch msg.String() {
+			case " ":
+				m.state = stateZoomRow
+			case "s":
+				m.state = stateSchema
+			case "/":
+				m.state = stateSearch
+			case "q", "ctrl+c":
+				return m, tea.Quit
+			}
+		}
+		m.table, cmd = m.table.Update(msg)
+		cmds = append(cmds, cmd)
+	case stateZoomRow:
+		switch msg := msg.(type) {
+		case tea.KeyMsg:
+			switch msg.String() {
+			case " ", "esc":
+				m.state = stateTable
+			}
+		}
+	case stateSchema:
+		switch msg.(type) {
+		case schema.Close:
+			m.state = stateTable
+			return m, nil
+		}
+		m.schema, cmd = m.schema.Update(msg)
+		cmds = append(cmds, cmd)
+	}
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case " ":
-			if m.state == stateTable {
-				m.state = stateZoomRow
-			}
-		case "s":
-			if m.state == stateTable {
-				m.state = stateSchema
-			}
-		case "/":
-			if m.state == stateTable {
-				m.state = stateSearch
-			}
-		case "esc":
-			if contains(stateOverlays, m.state) {
-				m.state = stateTable
-			}
-		case "q":
-			if m.state == stateTable {
-				return m, tea.Quit
-			}
 		case "ctrl+c":
 			return m, tea.Quit
-		}
-		switch m.state {
-		case stateTable:
-			m.table, cmd = m.table.Update(msg)
-			cmds = append(cmds, cmd)
-		case stateSchema:
-			m.schema, cmd = m.schema.Update(msg)
-			cmds = append(cmds, cmd)
 		}
 
 	case tea.WindowSizeMsg:
@@ -155,7 +161,7 @@ func (m model) View() string {
 	switch m.state {
 
 	case stateTable:
-		return baseStyle.Render(m.table.View()) + "\n"
+		return baseStyle.Render(m.table.View())
 
 	case stateZoomRow:
 		rawRow := m.table.SelectedRow()
@@ -171,7 +177,6 @@ func (m model) View() string {
 		return baseStyle.Width(m.termWidth - 2).Render(string(rendered))
 
 	case stateSchema:
-		m.schema.Update(tea.WindowSizeMsg{Width: m.termWidth, Height: m.termHeight})
 		return baseStyle.Render(m.schema.View())
 
 	case stateSearch:

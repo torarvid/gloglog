@@ -240,7 +240,7 @@ func (m Model[E]) Update(msg tea.Msg) (Model[E], tea.Cmd) {
 		}
 	case tea.WindowSizeMsg:
 		m.SetWidth(msg.Width - 2)
-		m.SetHeight(msg.Height - 5)
+		m.SetHeight(msg.Height - 4)
 	}
 
 	return m, tea.Batch(cmds...)
