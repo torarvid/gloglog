@@ -42,11 +42,6 @@ type model struct {
 }
 
 func newModel(logView config.LogView) *model {
-	columns := make([]table.ColumnSpec[string], len(logView.Attrs))
-	for i, c := range logView.Attrs {
-		columns[i] = ColumnFromConfig(c)
-	}
-
 	filename, exists := logView.Options["filename"]
 	if !exists {
 		panic("filename not found")
@@ -64,7 +59,6 @@ func newModel(logView config.LogView) *model {
 	}
 
 	t := table.New(
-		table.WithColumns(columns),
 		table.WithFocused[string](true),
 		table.WithHeight[string](27),
 	)
@@ -89,6 +83,7 @@ func newModel(logView config.LogView) *model {
 		filters: make([]RowFilter, 0),
 		schema:  schema.FromLogView(logView, 1, 1),
 	}
+	m.updateColumns(logView.Attrs)
 	m.AddFilters(RowFilter(func(s string) bool {
 		return strings.Contains(s, "PalletizeToteOrder")
 	}))
@@ -132,10 +127,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	case stateSchema:
-		switch msg.(type) {
+		switch msg := msg.(type) {
 		case schema.Close:
 			m.state = stateTable
 			return m, nil
+		case schema.UpdatedSchemaMsg:
+			m.updateColumns(msg.Attributes)
 		}
 		m.schema, cmd = m.schema.Update(msg)
 		cmds = append(cmds, cmd)
@@ -155,6 +152,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.termWidth, m.termHeight = msg.Width, msg.Height
 	}
 	return m, tea.Batch(cmds...)
+}
+
+func (m *model) updateColumns(attrs []config.Attribute) {
+	columns := make([]table.ColumnSpec[string], len(attrs))
+	for i, c := range attrs {
+		columns[i] = ColumnFromConfig(c)
+	}
+	m.table.SetColumns(columns)
 }
 
 func (m model) View() string {
@@ -215,7 +220,7 @@ func ColumnFromConfig(c config.Attribute) *Column {
 	return &Column{
 		title:       c.Name,
 		width:       c.Width,
-		valueGetter: valueFromSelector(c.Selector, c.Type, c.Format),
+		valueGetter: valueFromSelector(c.Selectors, c.Type, c.Format),
 	}
 }
 
@@ -239,34 +244,37 @@ func identity(s string) string {
 	return s
 }
 
-func valueFromSelector(selector, typ string, format *string) func(string) string {
-	if selector == "." {
-		return identity
-	}
-	partialSelectors := strings.Split(selector, "|")
-	return func(s string) string {
-		for _, sel := range partialSelectors {
-			sel = strings.TrimSpace(sel)
-			if strings.HasPrefix(sel, "json(") {
-				jsonPath := sel[5 : len(sel)-1]
-				if jsonPath == "." {
-					continue
+func valueFromSelector(selectors []string, typ string, format *string) func(string) string {
+	for _, selector := range selectors {
+		if selector == "." {
+			return identity
+		}
+		partialSelectors := strings.Split(selector, "|")
+		return func(s string) string {
+			for _, sel := range partialSelectors {
+				sel = strings.TrimSpace(sel)
+				if strings.HasPrefix(sel, "json(") {
+					jsonPath := sel[5 : len(sel)-1]
+					if jsonPath == "." {
+						continue
+					}
+					s = gjson.Get(s, jsonPath).String()
 				}
-				s = gjson.Get(s, jsonPath).String()
 			}
-		}
-		switch typ {
-		case "time":
-			t, err := time.Parse(time.RFC3339, s)
-			if err != nil {
-				return "Invalid"
+			switch typ {
+			case "time":
+				t, err := time.Parse(time.RFC3339, s)
+				if err != nil {
+					return "Invalid"
+				}
+				if format == nil {
+					return t.Format(time.StampMilli)
+				}
+				return t.Format(*format)
+			default:
+				return s
 			}
-			if format == nil {
-				return t.Format(time.StampMilli)
-			}
-			return t.Format(*format)
-		default:
-			return s
 		}
 	}
+	return nil
 }

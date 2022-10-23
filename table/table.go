@@ -289,6 +289,12 @@ func (m Model[E]) SelectedRow() E {
 	return m.rows[m.cursor]
 }
 
+// SetColumns sets the table columns (headers).
+func (m *Model[E]) SetColumns(cols []ColumnSpec[E]) {
+	m.cols = cols
+	m.UpdateViewport()
+}
+
 // SetRows set a new rows state.
 func (m *Model[E]) SetRows(r []E) {
 	m.rows = r

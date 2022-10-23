@@ -12,9 +12,9 @@ type LogView struct {
 }
 
 type Attribute struct {
-	Name     string
-	Width    int
-	Selector string
-	Type     string
-	Format   *string
+	Name      string
+	Width     int
+	Selectors []string
+	Type      string
+	Format    *string
 }

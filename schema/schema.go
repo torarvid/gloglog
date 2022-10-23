@@ -1,11 +1,14 @@
 package schema
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"strconv"
+	"strings"
 
+	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/charmbracelet/bubbles/textinput"
 	tea "github.com/charmbracelet/bubbletea"
@@ -27,26 +30,36 @@ var (
 )
 
 type Attribute struct {
-	Name       string
-	nameInput  textinput.Model
-	Width      int
-	widthInput textinput.Model
-	Selectors  []string
-	Type       string
-	Format     *string
+	Name      string
+	Width     int
+	Selectors []string
+	Type      string
+	Format    *string
+	inputs    []textinput.Model
 }
 
 func (a Attribute) FilterValue() string { return "" }
 
 func (a Attribute) View() string {
-	log.Println("PrintAttr", a.nameInput.Value(), a.nameInput.View())
-	return "Name\n" + a.nameInput.View() + "\n\n" + "Width\n" + a.widthInput.View()
+	labels := []string{"Name", "Width", "Selectors", "Type", "Format"}
+	parts := make([]string, len(labels))
+	for i, label := range labels {
+		parts[i] = label + "\n" + a.inputs[i].View()
+	}
+
+	return strings.Join(parts, "\n\n")
+}
+
+type KeyMap struct {
+	SelectNextField key.Binding
+	SelectPrevField key.Binding
 }
 
 type Model struct {
 	Attributes []Attribute
 	list       list.Model
-	selected   *Attribute
+	selected   *int
+	keyMap     KeyMap
 }
 
 func FromLogView(lv config.LogView, width, height int) Model {
@@ -57,22 +70,42 @@ func FromLogView(lv config.LogView, width, height int) Model {
 		nameInput.SetValue(attr.Name)
 		nameInput.CharLimit = 30
 		nameInput.Focus()
+
 		widthInput := textinput.New()
 		widthInput.Placeholder = "15"
 		widthInput.SetValue(strconv.Itoa(attr.Width))
+		widthInput.Blur()
+
+		selectorsInput := textinput.New()
+		selectorsInput.Placeholder = "error.code / server.host.ip / ..."
+		selectorsInput.SetValue("[\"" + strings.Join(attr.Selectors, "\", \"") + "\"]")
+		selectorsInput.Blur()
+
+		typeInput := textinput.New()
+		typeInput.Placeholder = "string / int / time / ..."
+		typeInput.SetValue(attr.Type)
+		typeInput.Blur()
+
+		formatInput := textinput.New()
+		formatInput.Placeholder = "2006-01-02 15:04:05.000"
+		if attr.Format != nil {
+			formatInput.SetValue(*attr.Format)
+		}
+		formatInput.Blur()
+
 		attrs[i] = Attribute{
-			Name:       attr.Name,
-			nameInput:  nameInput,
-			Width:      attr.Width,
-			widthInput: widthInput,
-			Selectors:  []string{attr.Selector},
-			Type:       attr.Type,
-			Format:     attr.Format,
+			Name:      attr.Name,
+			Width:     attr.Width,
+			Selectors: attr.Selectors,
+			Type:      attr.Type,
+			Format:    attr.Format,
+			inputs:    []textinput.Model{nameInput, widthInput, selectorsInput, typeInput, formatInput},
 		}
 	}
 	items := make([]list.Item, len(attrs))
 	for i, attr := range attrs {
-		items[i] = attr
+		attr := attr
+		items[i] = &attr
 	}
 
 	log.Println("Create schema")
@@ -80,11 +113,29 @@ func FromLogView(lv config.LogView, width, height int) Model {
 	l.Title = "Schema attributes"
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(false)
+	l.KeyMap.NextPage.SetEnabled(false)
+	l.KeyMap.PrevPage.SetEnabled(false)
+	l.KeyMap.GoToStart.SetEnabled(false)
+	l.KeyMap.GoToEnd.SetEnabled(false)
 	l.Styles.Title = titleStyle
 	l.Styles.PaginationStyle = paginationStyle
 	l.Styles.HelpStyle = helpStyle
 	l.DisableQuitKeybindings()
-	return Model{Attributes: attrs, list: l}
+	return Model{Attributes: attrs, list: l, keyMap: DefaultKeyMap()}
+
+}
+
+func DefaultKeyMap() KeyMap {
+	return KeyMap{
+		SelectNextField: key.NewBinding(
+			key.WithKeys("tab"),
+			key.WithHelp("next field", "Tab"),
+		),
+		SelectPrevField: key.NewBinding(
+			key.WithKeys("shift+tab"),
+			key.WithHelp("previous field", "Shift+Tab"),
+		),
+	}
 }
 
 func (m Model) Init() tea.Cmd {
@@ -103,20 +154,40 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	case tea.KeyMsg:
 		switch keypress := msg.String(); keypress {
 		case "enter":
-			attr, ok := m.list.SelectedItem().(Attribute)
-			if ok {
-				m.selected = &attr
-				m.list.KeyMap.CursorDown.SetEnabled(false)
-				m.list.KeyMap.CursorUp.SetEnabled(false)
+			if m.selected == nil {
+				m.selectAttr(m.list.Index())
+				return m, nil
+			} else {
+				i := *m.selected
+				m.Attributes[i].Name = m.Attributes[i].inputs[0].Value()
+				if w, err := strconv.Atoi(m.Attributes[i].inputs[1].Value()); err == nil {
+					m.Attributes[i].Width = w
+				}
+				var selectors []string
+				if err := json.Unmarshal([]byte(m.Attributes[i].inputs[2].Value()), &selectors); err == nil {
+					m.Attributes[i].Selectors = selectors
+				}
+				m.Attributes[i].Type = m.Attributes[i].inputs[3].Value()
+				if m.Attributes[i].inputs[4].Value() != "" {
+					format := m.Attributes[i].inputs[4].Value()
+					m.Attributes[i].Format = &format
+				} else {
+					m.Attributes[i].Format = nil
+				}
+				m.deselect()
+				return m, m.UpdateSchema()
 			}
-			return m, nil
 		case "esc":
 			if m.selected == nil {
 				return m, func() tea.Msg { return Close{} }
 			}
-			m.selected = nil
-			m.list.KeyMap.CursorDown.SetEnabled(true)
-			m.list.KeyMap.CursorUp.SetEnabled(true)
+			m.deselect()
+		}
+		switch {
+		case key.Matches(msg, m.keyMap.SelectNextField):
+			m.focusNextInput()
+		case key.Matches(msg, m.keyMap.SelectPrevField):
+			m.focusPrevInput()
 		}
 	}
 
@@ -124,26 +195,84 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	m.list, cmd = m.list.Update(msg)
 	cmds = append(cmds, cmd)
 	if m.selected != nil {
-		log.Println("Selected", m.selected.nameInput.Value())
-		m.selected.nameInput, cmd = m.selected.nameInput.Update(msg)
-		log.Println("Selected2", m.selected.nameInput.Value())
-		cmds = append(cmds, cmd)
-		m.selected.widthInput, cmd = m.selected.widthInput.Update(msg)
-		cmds = append(cmds, cmd)
+		inputs := m.Attributes[*m.selected].inputs
+		for i, input := range inputs {
+			if !input.Focused() {
+				continue
+			}
+			inputs[i], cmd = input.Update(msg)
+			cmds = append(cmds, cmd)
+			break
+		}
 	}
 	return m, tea.Batch(cmds...)
 }
 
-func (m Model) View() string {
-	if m.selected != nil {
-		log.Println("View", m.selected.nameInput.Value())
+func (m *Model) focusNextInput() {
+	inputs := m.Attributes[*m.selected].inputs
+	for i := range inputs {
+		if inputs[i].Focused() {
+			inputs[i].Blur()
+			inputs[(i+1)%len(inputs)].Focus()
+			return
+		}
 	}
+}
+
+func (m *Model) focusPrevInput() {
+	inputs := m.Attributes[*m.selected].inputs
+	for i, input := range inputs {
+		if input.Focused() {
+			inputs[i].Blur()
+			inputs[(i-1+len(inputs))%len(inputs)].Focus()
+			return
+		}
+	}
+}
+
+type UpdatedSchemaMsg struct {
+	Attributes []config.Attribute
+}
+
+func (m Model) UpdateSchema() tea.Cmd {
+	return func() tea.Msg {
+		cfgAttributes := make([]config.Attribute, len(m.Attributes))
+		for i, attr := range m.Attributes {
+			cfgAttributes[i] = config.Attribute{
+				Name:      attr.Name,
+				Width:     attr.Width,
+				Selectors: attr.Selectors,
+				Type:      attr.Type,
+				Format:    attr.Format,
+			}
+		}
+		return UpdatedSchemaMsg{Attributes: cfgAttributes}
+	}
+}
+
+func (m Model) View() string {
 	attrList := m.list.View()
 	selectionView := ""
 	if m.selected != nil {
-		selectionView = detailStyle.Height(m.list.Height()).Render(m.selected.View())
+		selectionView = detailStyle.Height(m.list.Height()).Render(m.Attributes[*m.selected].View())
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Left, attrList, selectionView)
+}
+
+func (m *Model) selectAttr(i int) {
+	m.selected = &i
+	m.list.KeyMap.CursorDown.SetEnabled(false)
+	m.list.KeyMap.CursorUp.SetEnabled(false)
+	m.keyMap.SelectNextField.SetEnabled(true)
+	m.keyMap.SelectPrevField.SetEnabled(true)
+}
+
+func (m *Model) deselect() {
+	m.selected = nil
+	m.list.KeyMap.CursorDown.SetEnabled(true)
+	m.list.KeyMap.CursorUp.SetEnabled(true)
+	m.keyMap.SelectNextField.SetEnabled(false)
+	m.keyMap.SelectPrevField.SetEnabled(false)
 }
 
 type itemDelegate struct{}
@@ -152,7 +281,7 @@ func (d itemDelegate) Height() int                               { return 1 }
 func (d itemDelegate) Spacing() int                              { return 0 }
 func (d itemDelegate) Update(msg tea.Msg, m *list.Model) tea.Cmd { return nil }
 func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list.Item) {
-	attr, ok := listItem.(Attribute)
+	attr, ok := listItem.(*Attribute)
 	if !ok {
 		return
 	}
