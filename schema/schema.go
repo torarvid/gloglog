@@ -102,11 +102,7 @@ func FromLogView(lv config.LogView, width, height int) Model {
 			inputs:    []textinput.Model{nameInput, widthInput, selectorsInput, typeInput, formatInput},
 		}
 	}
-	items := make([]list.Item, len(attrs))
-	for i, attr := range attrs {
-		attr := attr
-		items[i] = &attr
-	}
+	items := listItemsFromAttributes(attrs)
 
 	log.Println("Create schema")
 	l := list.New(items, itemDelegate{}, width, height)
@@ -123,6 +119,15 @@ func FromLogView(lv config.LogView, width, height int) Model {
 	l.DisableQuitKeybindings()
 	return Model{Attributes: attrs, list: l, keyMap: DefaultKeyMap()}
 
+}
+
+func listItemsFromAttributes(attrs []Attribute) []list.Item {
+	items := make([]list.Item, len(attrs))
+	for i, attr := range attrs {
+		attr := attr
+		items[i] = &attr
+	}
+	return items
 }
 
 func DefaultKeyMap() KeyMap {
@@ -175,6 +180,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 					m.Attributes[i].Format = nil
 				}
 				m.deselect()
+				m.list.SetItems(listItemsFromAttributes(m.Attributes))
 				return m, m.UpdateSchema()
 			}
 		case "esc":
