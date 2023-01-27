@@ -70,20 +70,20 @@ func DefaultKeyMap() KeyMap {
 			key.WithHelp("→/l", "right"),
 		),
 		PageUp: key.NewBinding(
-			key.WithKeys("b", "pgup"),
-			key.WithHelp("b/pgup", "page up"),
+			key.WithKeys("ctrl+b", "pgup"),
+			key.WithHelp("ctrl+b/pgup", "page up"),
 		),
 		PageDown: key.NewBinding(
-			key.WithKeys("f", "pgdown"),
-			key.WithHelp("f/pgdn", "page down"),
+			key.WithKeys("ctrl+f", "pgdown"),
+			key.WithHelp("ctrl+f/pgdn", "page down"),
 		),
 		HalfPageUp: key.NewBinding(
-			key.WithKeys("u", "ctrl+u"),
-			key.WithHelp("u", "½ page up"),
+			key.WithKeys("ctrl+u"),
+			key.WithHelp("ctrl+u", "½ page up"),
 		),
 		HalfPageDown: key.NewBinding(
-			key.WithKeys("d", "ctrl+d"),
-			key.WithHelp("d", "½ page down"),
+			key.WithKeys("ctrl+d"),
+			key.WithHelp("ctrl+d", "½ page down"),
 		),
 		GotoTop: key.NewBinding(
 			key.WithKeys("home", "g"),
