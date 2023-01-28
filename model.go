@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"strings"
@@ -42,6 +43,7 @@ type model struct {
 }
 
 func newModel(logView config.LogView) *model {
+	modelInitTime := time.Now()
 	filename, exists := logView.Options["filename"]
 	if !exists {
 		panic("filename not found")
@@ -53,10 +55,13 @@ func newModel(logView config.LogView) *model {
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
+	fmt.Fprintf(os.Stderr, "Scanning file '%s'", filename)
 	rows := make([]string, 0)
 	for scanner.Scan() {
 		rows = append(rows, scanner.Text())
 	}
+	scanTime := time.Since(modelInitTime)
+	fmt.Fprintf(os.Stderr, " done in %d ms. %d rows found.\n", scanTime.Milliseconds(), len(rows))
 
 	t := table.New(
 		table.WithFocused[string](true),
@@ -163,6 +168,12 @@ func (m *model) updateColumns(attrs []config.Attribute) {
 }
 
 func (m model) View() string {
+	if !firstDraw {
+		timeToFirstDraw := time.Since(appStartTime)
+		log.Printf("Time to first draw: %s\n", timeToFirstDraw)
+		firstDraw = true
+	}
+
 	switch m.state {
 
 	case stateTable:
