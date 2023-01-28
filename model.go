@@ -89,9 +89,7 @@ func newModel(logView config.LogView) *model {
 		schema:  schema.FromLogView(logView, 1, 1),
 	}
 	m.updateColumns(logView.Attrs)
-	m.AddFilters(RowFilter(func(s string) bool {
-		return strings.Contains(s, "PalletizeToteOrder")
-	}))
+	m.table.SetRows(m.rows)
 	return m
 }
 
@@ -212,12 +210,16 @@ func (m *model) AddFilters(fs ...RowFilter) {
 func (m *model) updateFilteredRows() {
 	m.filteredRows = make([]string, 0, len(m.rows)/10)
 	for _, row := range m.rows {
+		include := true
 		for _, filter := range m.filters {
 			if !filter.Filter(row) {
-				continue
+				include = false
+				break
 			}
 		}
-		m.filteredRows = append(m.filteredRows, row)
+		if include {
+			m.filteredRows = append(m.filteredRows, row)
+		}
 	}
 }
 
