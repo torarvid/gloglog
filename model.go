@@ -14,6 +14,7 @@ import (
 	"github.com/tidwall/gjson"
 	"github.com/torarvid/gloglog/config"
 	"github.com/torarvid/gloglog/schema"
+	"github.com/torarvid/gloglog/search"
 	"github.com/torarvid/gloglog/table"
 )
 
@@ -37,6 +38,7 @@ type model struct {
 	filteredRows []string
 	view         config.LogView
 	filters      []RowFilter
+	search       search.Model
 	state        int
 	termWidth    int
 	termHeight   int
@@ -87,6 +89,7 @@ func newModel(logView config.LogView) *model {
 		view:    logView,
 		filters: make([]RowFilter, 0),
 		schema:  schema.FromLogView(logView, 1, 1),
+		search:  search.FromLogView(logView, 40, 15),
 	}
 	m.updateColumns(logView.Attrs)
 	m.table.SetRows(m.rows)
@@ -138,6 +141,23 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.updateColumns(msg.Attributes)
 		}
 		m.schema, cmd = m.schema.Update(msg)
+		cmds = append(cmds, cmd)
+	case stateSearch:
+		switch msg := msg.(type) {
+		case search.Close:
+			m.state = stateTable
+			return m, nil
+		case search.UpdatedFiltersMsg:
+			rowFilters := make([]RowFilter, len(msg.Filters))
+			for i, filter := range msg.Filters {
+				rowFilter := func(row string) bool {
+					return strings.Contains(row, filter.Term)
+				}
+				rowFilters[i] = rowFilter
+			}
+			m.SetFilters(rowFilters)
+		}
+		m.search, cmd = m.search.Update(msg)
 		cmds = append(cmds, cmd)
 	}
 	switch msg := msg.(type) {
@@ -194,15 +214,15 @@ func (m model) View() string {
 		return baseStyle.Render(m.schema.View())
 
 	case stateSearch:
-		return ""
+		return baseStyle.Render(m.search.View())
 
 	default:
 		panic("Unknown state")
 	}
 }
 
-func (m *model) AddFilters(fs ...RowFilter) {
-	m.filters = append(m.filters, fs...)
+func (m *model) SetFilters(fs []RowFilter) {
+	m.filters = fs
 	m.updateFilteredRows()
 	m.table.SetRows(m.filteredRows)
 }
@@ -212,7 +232,7 @@ func (m *model) updateFilteredRows() {
 	for _, row := range m.rows {
 		include := true
 		for _, filter := range m.filters {
-			if !filter.Filter(row) {
+			if !filter(row) {
 				include = false
 				break
 			}
