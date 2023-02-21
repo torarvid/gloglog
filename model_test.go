@@ -31,3 +31,37 @@ func TestFilterSimple(t *testing.T) {
 		t.Errorf("Expected 0 rows, got %d", len(mainModel.filteredRows))
 	}
 }
+
+func TestValueFromSelectors(t *testing.T) {
+	testRow := `{"level":"info","msg":"hello world","time":"2020-01-01T00:00:00Z"}`
+
+	// single selector "." should yield the whole row
+	value := valueFromSelector([]string{"."}, "", nil)(testRow)
+	if value != testRow {
+		t.Errorf("Expected value to be '%s', got '%s'", testRow, value)
+	}
+
+	// single selector "json(level)" should yield "info"
+	value = valueFromSelector([]string{"json(level)"}, "", nil)(testRow)
+	if value != "info" {
+		t.Errorf("Expected value to be 'info', got '%s'", value)
+	}
+
+	// single selector "json(non-existing-key)" should yield ""
+	value = valueFromSelector([]string{"json(non-existing-key)"}, "", nil)(testRow)
+	if value != "" {
+		t.Errorf("Expected value to be '', got '%s'", value)
+	}
+
+	// two selectors "json(msg)" and "json(level)" should yield "hello world" (first match)
+	value = valueFromSelector([]string{"json(msg)", "json(level)"}, "", nil)(testRow)
+	if value != "hello world" {
+		t.Errorf("Expected value to be 'hello world', got '%s'", value)
+	}
+
+	// two selectors "json(non-existing-key)" and "json(level)" should yield "info" (first match)
+	value = valueFromSelector([]string{"json(non-existing-key)", "json(level)"}, "", nil)(testRow)
+	if value != "info" {
+		t.Errorf("Expected value to be 'info', got '%s'", value)
+	}
+}

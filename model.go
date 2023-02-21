@@ -279,12 +279,14 @@ func identity(s string) string {
 }
 
 func valueFromSelector(selectors []string, typ string, format *string) func(string) string {
-	for _, selector := range selectors {
+	getters := make([]func(string) string, len(selectors))
+	for i, selector := range selectors {
 		if selector == "." {
-			return identity
+			getters[i] = identity
+			continue
 		}
 		partialSelectors := strings.Split(selector, "|")
-		return func(s string) string {
+		getters[i] = func(s string) string {
 			for _, sel := range partialSelectors {
 				sel = strings.TrimSpace(sel)
 				if strings.HasPrefix(sel, "json(") {
@@ -310,5 +312,13 @@ func valueFromSelector(selectors []string, typ string, format *string) func(stri
 			}
 		}
 	}
-	return nil
+	return func(input string) (out string) {
+		for _, getter := range getters {
+			out = getter(input)
+			if out != "" {
+				break
+			}
+		}
+		return out
+	}
 }
