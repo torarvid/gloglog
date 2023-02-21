@@ -148,14 +148,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.state = stateTable
 			return m, nil
 		case search.UpdatedFiltersMsg:
-			rowFilters := make([]RowFilter, len(msg.Filters))
-			for i, filter := range msg.Filters {
-				rowFilter := func(row string) bool {
-					return strings.Contains(row, filter.Term)
-				}
-				rowFilters[i] = rowFilter
-			}
-			m.SetFilters(rowFilters)
+			m.SetFilters(msg.Filters)
 		}
 		m.search, cmd = m.search.Update(msg)
 		cmds = append(cmds, cmd)
@@ -221,8 +214,16 @@ func (m model) View() string {
 	}
 }
 
-func (m *model) SetFilters(fs []RowFilter) {
-	m.filters = fs
+func (m *model) SetFilters(filters []config.Filter) {
+	rowFilters := make([]RowFilter, len(filters))
+	for i, filter := range filters {
+		filter := filter
+		rowFilter := func(row string) bool {
+			return strings.Contains(row, filter.Term)
+		}
+		rowFilters[i] = rowFilter
+	}
+	m.filters = rowFilters
 	m.updateFilteredRows()
 	m.table.SetRows(m.filteredRows)
 }
