@@ -1,6 +1,12 @@
 package config
 
-import "fmt"
+import (
+	"fmt"
+	"io"
+	"os"
+
+	"github.com/pelletier/go-toml/v2"
+)
 
 type Config struct {
 	SavedViews []LogView
@@ -21,6 +27,66 @@ func (lv LogView) GetAttributeWithName(name string) *Attribute {
 		}
 	}
 	return nil
+}
+
+var testOverrideReader io.Reader
+
+func Load() Config {
+	reader, err := os.Open(getFilePath())
+	if err != nil {
+		panic(err)
+	}
+	defer reader.Close()
+	return LoadFrom(reader)
+}
+
+func LoadFrom(reader io.Reader) Config {
+	configBytes, err := io.ReadAll(reader)
+	if err != nil {
+		panic(err)
+	}
+
+	var config Config
+	err = toml.Unmarshal(configBytes, &config)
+	if err != nil {
+		panic(err)
+	}
+	return config
+}
+
+func (c Config) Save() {
+	writer, err := os.Open(getFilePath())
+	if err != nil {
+		panic(err)
+	}
+	defer writer.Close()
+	c.SaveTo(writer)
+}
+
+func (c Config) SaveTo(writer io.Writer) {
+	configBytes, err := toml.Marshal(c)
+	if err != nil {
+		panic(err)
+	}
+
+	_, err = writer.Write(configBytes)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func getFilePath() string {
+	folder := os.Getenv("XDG_CONFIG_HOME")
+	if folder == "" {
+		var err error
+		folder, err = os.UserConfigDir()
+		if err != nil {
+			panic(err)
+		}
+	}
+	return fmt.Sprintf(
+		"%s%c%s%c%s", folder, os.PathSeparator, "gloglog", os.PathSeparator, "config.toml",
+	)
 }
 
 type Attribute struct {

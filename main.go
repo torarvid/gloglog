@@ -6,23 +6,8 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/pelletier/go-toml/v2"
 	"github.com/torarvid/gloglog/config"
 )
-
-func loadConfig() config.Config {
-	configBytes, err := os.ReadFile("foo.toml")
-	if err != nil {
-		panic(err)
-	}
-
-	var config config.Config
-	err = toml.Unmarshal(configBytes, &config)
-	if err != nil {
-		panic(err)
-	}
-	return config
-}
 
 var appStartTime time.Time = time.Now()
 var firstDraw bool
@@ -34,7 +19,7 @@ func main() {
 	}
 	log.SetOutput(f)
 
-	config := loadConfig()
+	config := config.Load()
 	cfgLoadTime := time.Since(appStartTime)
 	log.Println("Config loaded in", cfgLoadTime)
 	view := config.SavedViews[0]
