@@ -9,7 +9,8 @@ import (
 )
 
 type Config struct {
-	SavedViews []LogView
+	SavedViews []*LogView
+	activeView *LogView
 }
 
 type LogView struct {
@@ -29,9 +30,11 @@ func (lv LogView) GetAttributeWithName(name string) *Attribute {
 	return nil
 }
 
-var testOverrideReader io.Reader
+var (
+	TheConfig *Config
+)
 
-func Load() Config {
+func Load() *Config {
 	reader, err := os.Open(getFilePath())
 	if err != nil {
 		panic(err)
@@ -40,7 +43,7 @@ func Load() Config {
 	return LoadFrom(reader)
 }
 
-func LoadFrom(reader io.Reader) Config {
+func LoadFrom(reader io.Reader) *Config {
 	configBytes, err := io.ReadAll(reader)
 	if err != nil {
 		panic(err)
@@ -51,11 +54,12 @@ func LoadFrom(reader io.Reader) Config {
 	if err != nil {
 		panic(err)
 	}
-	return config
+	TheConfig = &config
+	return &config
 }
 
 func (c Config) Save() {
-	writer, err := os.Open(getFilePath())
+	writer, err := os.Create(getFilePath())
 	if err != nil {
 		panic(err)
 	}
@@ -73,6 +77,14 @@ func (c Config) SaveTo(writer io.Writer) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func (c *Config) GetActiveView() *LogView {
+	return c.activeView
+}
+
+func (c *Config) SetActiveView(view *LogView) {
+	c.activeView = view
 }
 
 func getFilePath() string {

@@ -22,7 +22,8 @@ func main() {
 	config := config.Load()
 	cfgLoadTime := time.Since(appStartTime)
 	log.Println("Config loaded in", cfgLoadTime)
-	view := config.SavedViews[0]
+	config.SetActiveView(config.SavedViews[0])
+	view := *config.GetActiveView()
 
 	m := newModel(view)
 	modelInitTime := time.Since(appStartTime) - cfgLoadTime

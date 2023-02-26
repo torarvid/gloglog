@@ -176,6 +176,9 @@ func (m *model) updateColumns(attrs []config.Attribute) {
 		columns[i] = ColumnFromConfig(c)
 	}
 	m.table.SetColumns(columns)
+	view := config.TheConfig.GetActiveView()
+	view.Attrs = attrs
+	config.TheConfig.Save()
 }
 
 func (m model) View() string {
