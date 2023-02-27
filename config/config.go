@@ -30,6 +30,15 @@ func (lv LogView) GetAttributeWithName(name string) *Attribute {
 	return nil
 }
 
+func (lv LogView) GetRows() []string {
+	switch lv.SourceId {
+	case "file":
+		return fromFile(lv)
+	default:
+		panic("Unknown source id: " + lv.SourceId)
+	}
+}
+
 var (
 	TheConfig *Config
 )

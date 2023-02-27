@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -46,22 +45,7 @@ type model struct {
 
 func newModel(logView config.LogView) *model {
 	modelInitTime := time.Now()
-	filename, exists := logView.Options["filename"]
-	if !exists {
-		panic("filename not found")
-	}
-	file, err := os.Open(filename)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
-
-	scanner := bufio.NewScanner(file)
-	fmt.Fprintf(os.Stderr, "Scanning file '%s'", filename)
-	rows := make([]string, 0)
-	for scanner.Scan() {
-		rows = append(rows, scanner.Text())
-	}
+	rows := logView.GetRows()
 	scanTime := time.Since(modelInitTime)
 	fmt.Fprintf(os.Stderr, " done in %d ms. %d rows found.\n", scanTime.Milliseconds(), len(rows))
 
