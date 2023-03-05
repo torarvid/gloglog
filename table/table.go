@@ -393,7 +393,7 @@ func (m *Model[E]) GrowColumn() {
 }
 
 func (m Model[E]) headersView() string {
-	var s = make([]string, 0, len(m.cols))
+	s := make([]string, 0, len(m.cols))
 	remainingWidth := m.Width()
 	padding := m.styles.Header.GetHorizontalPadding()
 	for i, col := range m.cols {
@@ -414,7 +414,7 @@ func (m Model[E]) headersView() string {
 }
 
 func (m *Model[E]) renderRow(rowID int) string {
-	var s = make([]string, 0, len(m.cols))
+	s := make([]string, 0, len(m.cols))
 	remainingWidth := m.Width()
 	padding := m.styles.Cell.GetHorizontalPadding()
 	for i, col := range m.cols {

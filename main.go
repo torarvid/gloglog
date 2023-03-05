@@ -9,8 +9,10 @@ import (
 	"github.com/torarvid/gloglog/config"
 )
 
-var appStartTime time.Time = time.Now()
-var firstDraw bool
+var (
+	appStartTime time.Time = time.Now()
+	firstDraw    bool
+)
 
 func main() {
 	f, err := os.OpenFile("log.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)

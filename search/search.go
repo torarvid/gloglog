@@ -18,12 +18,15 @@ var (
 	itemStyle         = lipgloss.NewStyle().PaddingLeft(4)
 	selectedItemStyle = lipgloss.NewStyle().PaddingLeft(2).Foreground(lipgloss.Color("170"))
 	paginationStyle   = list.DefaultStyles().PaginationStyle.PaddingLeft(4)
-	helpStyle         = list.DefaultStyles().HelpStyle.PaddingLeft(4).PaddingBottom(1).PaddingRight(4)
-	detailStyle       = lipgloss.NewStyle().
-				BorderLeft(true).
-				BorderStyle(lipgloss.NormalBorder()).
-				PaddingLeft(2).
+	helpStyle         = list.DefaultStyles().
+				HelpStyle.PaddingLeft(4).
+				PaddingBottom(1).
 				PaddingRight(4)
+	detailStyle = lipgloss.NewStyle().
+			BorderLeft(true).
+			BorderStyle(lipgloss.NormalBorder()).
+			PaddingLeft(2).
+			PaddingRight(4)
 )
 
 type KeyMap struct {
@@ -58,7 +61,12 @@ type Model struct {
 	logView  config.LogView
 }
 
-func newFilter(term string, op config.FilterOp, attr *config.Attribute, attrPlaceholder string) Filter {
+func newFilter(
+	term string,
+	op config.FilterOp,
+	attr *config.Attribute,
+	attrPlaceholder string,
+) Filter {
 	termInput := textinput.New()
 	termInput.Placeholder = "Filter term"
 	termInput.SetValue(term)
@@ -112,7 +120,6 @@ func FromLogView(lv config.LogView, width, height int) Model {
 	l.Styles.HelpStyle = helpStyle
 	l.DisableQuitKeybindings()
 	return Model{Filters: filters, list: l, keyMap: DefaultKeyMap(), logView: lv}
-
 }
 
 func listItemsFromFilters(filters []Filter) []list.Item {

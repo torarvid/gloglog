@@ -28,8 +28,6 @@ const (
 	stateSearch
 )
 
-var stateOverlays []int = []int{stateZoomRow, stateSchema, stateSearch}
-
 type model struct {
 	table        table.Model[string]
 	schema       schema.Model

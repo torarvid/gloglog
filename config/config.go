@@ -39,9 +39,7 @@ func (lv LogView) GetRows() []string {
 	}
 }
 
-var (
-	TheConfig *Config
-)
+var TheConfig *Config
 
 func Load() *Config {
 	reader, err := os.Open(getFilePath())
