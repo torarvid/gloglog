@@ -87,6 +87,9 @@ func (c Config) SaveTo(writer io.Writer) {
 }
 
 func (c *Config) GetActiveView() *LogView {
+	if c.activeView == nil {
+		c.SetActiveView(c.SavedViews[0])
+	}
 	return c.activeView
 }
 

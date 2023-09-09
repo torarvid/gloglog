@@ -19,10 +19,9 @@ func main() {
 	config := config.Load()
 	cfgLoadTime := time.Since(appStartTime)
 	slog.Info("Config loaded in", "time", cfgLoadTime)
-	config.SetActiveView(config.SavedViews[0])
-	view := *config.GetActiveView()
+	view := config.GetActiveView()
 
-	m := newModel(view)
+	m := newModel(*view)
 	modelInitTime := time.Since(appStartTime) - cfgLoadTime
 	slog.Info("Model initialized in", "time", modelInitTime)
 	if err := tea.NewProgram(m, tea.WithAltScreen()).Start(); err != nil {
