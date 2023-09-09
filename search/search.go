@@ -32,6 +32,34 @@ var (
 type KeyMap struct {
 	SelectNextField key.Binding
 	SelectPrevField key.Binding
+	EditFilter      key.Binding
+	NewFilter       key.Binding
+	Exit            key.Binding
+}
+
+func DefaultKeyMap() KeyMap {
+	return KeyMap{
+		SelectNextField: key.NewBinding(
+			key.WithKeys("tab"),
+			key.WithHelp("next field", "Tab"),
+		),
+		SelectPrevField: key.NewBinding(
+			key.WithKeys("shift+tab"),
+			key.WithHelp("previous field", "Shift+Tab"),
+		),
+		EditFilter: key.NewBinding(
+			key.WithKeys("enter"),
+			key.WithHelp("edit filter", "Enter"),
+		),
+		NewFilter: key.NewBinding(
+			key.WithKeys("ctrl+n"),
+			key.WithHelp("new filter", "Ctrl+N"),
+		),
+		Exit: key.NewBinding(
+			key.WithKeys("esc"),
+			key.WithHelp("exit", "Esc"),
+		),
+	}
 }
 
 type Filter struct {
@@ -106,8 +134,10 @@ func FromLogView(lv config.LogView, width, height int) Model {
 		filters[i] = newFilter(filter.Term, filter.Operator, filter.Attr, attrPlaceholder)
 	}
 	items := listItemsFromFilters(filters)
+	keyMap := DefaultKeyMap()
+	keys := []key.Binding{keyMap.SelectNextField, keyMap.SelectPrevField}
 
-	l := list.New(items, itemDelegate{}, width, height)
+	l := list.New(items, itemDelegate{keys}, width, height)
 	l.Title = "Search filters"
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(false)
@@ -119,7 +149,7 @@ func FromLogView(lv config.LogView, width, height int) Model {
 	l.Styles.PaginationStyle = paginationStyle
 	l.Styles.HelpStyle = helpStyle
 	l.DisableQuitKeybindings()
-	return Model{Filters: filters, list: l, keyMap: DefaultKeyMap(), logView: lv}
+	return Model{Filters: filters, list: l, keyMap: keyMap, logView: lv}
 }
 
 func listItemsFromFilters(filters []Filter) []list.Item {
@@ -129,19 +159,6 @@ func listItemsFromFilters(filters []Filter) []list.Item {
 		items[i] = &filter
 	}
 	return items
-}
-
-func DefaultKeyMap() KeyMap {
-	return KeyMap{
-		SelectNextField: key.NewBinding(
-			key.WithKeys("tab"),
-			key.WithHelp("next field", "Tab"),
-		),
-		SelectPrevField: key.NewBinding(
-			key.WithKeys("shift+tab"),
-			key.WithHelp("previous field", "Shift+Tab"),
-		),
-	}
 }
 
 func (m Model) Init() tea.Cmd {
@@ -158,8 +175,17 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 		return m, nil
 
 	case tea.KeyMsg:
-		switch keypress := msg.String(); keypress {
-		case "enter":
+		switch {
+		case key.Matches(msg, m.keyMap.SelectNextField):
+			m.focusNextInput()
+		case key.Matches(msg, m.keyMap.SelectPrevField):
+			m.focusPrevInput()
+		case key.Matches(msg, m.keyMap.Exit):
+			if m.selected == nil {
+				return m, func() tea.Msg { return Close{} }
+			}
+			m.deselect()
+		case key.Matches(msg, m.keyMap.EditFilter):
 			if m.selected == nil {
 				m.selectFilter(m.list.Index())
 				return m, nil
@@ -176,21 +202,10 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				m.list.SetItems(listItemsFromFilters(m.Filters))
 				return m, m.UpdateFilters()
 			}
-		case "esc":
-			if m.selected == nil {
-				return m, func() tea.Msg { return Close{} }
-			}
-			m.deselect()
-		case "ctrl+n":
+		case key.Matches(msg, m.keyMap.NewFilter):
 			m.Filters = append(m.Filters, newFilter("", config.Contains, nil, ""))
 			m.list.SetItems(listItemsFromFilters(m.Filters))
 			m.selectFilter(len(m.Filters) - 1)
-		}
-		switch {
-		case key.Matches(msg, m.keyMap.SelectNextField):
-			m.focusNextInput()
-		case key.Matches(msg, m.keyMap.SelectPrevField):
-			m.focusPrevInput()
 		}
 	}
 
@@ -276,7 +291,9 @@ func (m *Model) deselect() {
 	m.keyMap.SelectPrevField.SetEnabled(false)
 }
 
-type itemDelegate struct{}
+type itemDelegate struct {
+	keys []key.Binding
+}
 
 func (d itemDelegate) Height() int                               { return 1 }
 func (d itemDelegate) Spacing() int                              { return 0 }
@@ -302,3 +319,5 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 
 	fmt.Fprint(w, fn(str))
 }
+func (d itemDelegate) ShortHelp() []key.Binding  { return d.keys }
+func (d itemDelegate) FullHelp() [][]key.Binding { return nil }
