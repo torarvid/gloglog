@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"strconv"
 	"strings"
 
@@ -119,7 +119,7 @@ func FromLogView(lv config.LogView, width, height int) Model {
 	}
 	items := listItemsFromAttributes(attrs)
 
-	log.Println("Create schema")
+	slog.Info("Create schema")
 	keyMap := MainKeyMap()
 	keys := []key.Binding{keyMap.EnterDetail, keyMap.Exit, keyMap.NewField, keyMap.DeleteField}
 	l := list.New(items, itemDelegate{keys}, width, height)

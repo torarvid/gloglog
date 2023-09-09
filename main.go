@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"log/slog"
 	"os"
 	"time"
 
@@ -15,23 +15,29 @@ var (
 )
 
 func main() {
-	f, err := os.OpenFile("log.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		log.Fatal(err)
-	}
-	log.SetOutput(f)
-
+	initLogger()
 	config := config.Load()
 	cfgLoadTime := time.Since(appStartTime)
-	log.Println("Config loaded in", cfgLoadTime)
+	slog.Info("Config loaded in", "time", cfgLoadTime)
 	config.SetActiveView(config.SavedViews[0])
 	view := *config.GetActiveView()
 
 	m := newModel(view)
 	modelInitTime := time.Since(appStartTime) - cfgLoadTime
-	log.Println("Model initialized in", modelInitTime)
+	slog.Info("Model initialized in", "time", modelInitTime)
 	if err := tea.NewProgram(m, tea.WithAltScreen()).Start(); err != nil {
-		log.Println("Error running program:", err)
+		slog.Info("Error running program:", "error", err)
 		os.Exit(1)
 	}
+}
+
+func initLogger() {
+	f, err := os.OpenFile("log.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		slog.Error(err.Error())
+		panic(err)
+	}
+	handler := slog.NewTextHandler(f, nil)
+	logger := slog.New(handler)
+	slog.SetDefault(logger)
 }

@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -166,7 +166,7 @@ func (m *model) updateColumns(attrs []config.Attribute) {
 func (m model) View() string {
 	if !firstDraw {
 		timeToFirstDraw := time.Since(appStartTime)
-		log.Printf("Time to first draw: %s\n", timeToFirstDraw)
+		slog.Info("Time to first draw: %s\n", "time", timeToFirstDraw)
 		firstDraw = true
 	}
 

@@ -1,7 +1,7 @@
 package help
 
 import (
-	"log"
+	"log/slog"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -15,7 +15,7 @@ func (m Model) Init() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	log.Println("help update: ", msg)
+	slog.Info("help update: ", "msg", msg)
 	return m, nil
 }
 
@@ -24,16 +24,16 @@ func (m Model) View() string {
 }
 
 func (m *Model) Blur() {
-	log.Println("help blur: ")
+	slog.Info("help blur: ")
 	m.focused = false
 }
 
 func (m *Model) Focus() {
-	log.Println("help focus: ")
+	slog.Info("help focus: ")
 	m.focused = true
 }
 
 func (m Model) Focused() bool {
-	log.Println("help focused: ", m.focused)
+	slog.Info("help focused: ", "focused", m.focused)
 	return m.focused
 }

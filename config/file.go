@@ -3,7 +3,7 @@ package config
 import (
 	"bufio"
 	"fmt"
-	"log"
+	"log/slog"
 	"os"
 )
 
@@ -14,7 +14,8 @@ func fromFile(logView LogView) []string {
 	}
 	file, err := os.Open(filename)
 	if err != nil {
-		log.Fatal(err)
+		slog.Error(err.Error())
+		panic(err)
 	}
 	defer file.Close()
 
