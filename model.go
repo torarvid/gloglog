@@ -166,7 +166,7 @@ func (m *model) updateColumns(attrs []config.Attribute) {
 func (m model) View() string {
 	if !firstDraw {
 		timeToFirstDraw := time.Since(appStartTime)
-		slog.Info("Time to first draw: %s\n", "time", timeToFirstDraw)
+		slog.Info("First draw happened", "delay", timeToFirstDraw)
 		firstDraw = true
 	}
 
