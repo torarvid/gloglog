@@ -35,6 +35,7 @@ type KeyMap struct {
 	SelectPrevField key.Binding
 	EditFilter      key.Binding
 	NewFilter       key.Binding
+	DeleteFilter    key.Binding
 	Exit            key.Binding
 }
 
@@ -42,23 +43,27 @@ func DefaultKeyMap() KeyMap {
 	return KeyMap{
 		SelectNextField: key.NewBinding(
 			key.WithKeys("tab"),
-			key.WithHelp("next field", "Tab"),
+			key.WithHelp("next field", "tab"),
 		),
 		SelectPrevField: key.NewBinding(
 			key.WithKeys("shift+tab"),
-			key.WithHelp("previous field", "Shift+Tab"),
+			key.WithHelp("previous field", "shift+tab"),
 		),
 		EditFilter: key.NewBinding(
 			key.WithKeys("enter"),
-			key.WithHelp("edit filter", "Enter"),
+			key.WithHelp("edit filter", "enter"),
 		),
 		NewFilter: key.NewBinding(
 			key.WithKeys("ctrl+n"),
-			key.WithHelp("new filter", "Ctrl+N"),
+			key.WithHelp("new filter", "ctrl+n"),
+		),
+		DeleteFilter: key.NewBinding(
+			key.WithKeys("ctrl+d"),
+			key.WithHelp("delete filter", "ctrl+d"),
 		),
 		Exit: key.NewBinding(
 			key.WithKeys("esc"),
-			key.WithHelp("exit", "Esc"),
+			key.WithHelp("exit", "esc"),
 		),
 	}
 }
@@ -136,9 +141,10 @@ func FromLogView(lv config.LogView, width, height int) Model {
 	}
 	items := listItemsFromFilters(filters)
 	keyMap := DefaultKeyMap()
-	keys := []key.Binding{keyMap.SelectNextField, keyMap.SelectPrevField}
+	mainKeys := []key.Binding{keyMap.EditFilter, keyMap.NewFilter, keyMap.DeleteFilter, keyMap.Exit}
+	editKeys := []key.Binding{keyMap.SelectNextField, keyMap.SelectPrevField}
 
-	l := list.New(items, itemDelegate{keys}, width, height)
+	l := list.New(items, itemDelegate{mainKeys, editKeys}, width, height)
 	l.Title = "Search filters"
 	l.SetShowStatusBar(false)
 	l.SetFilteringEnabled(false)
@@ -194,6 +200,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			} else {
 				i := *m.selected
 				m.Filters[i].Term = m.Filters[i].inputs[0].Value()
+				// TODO: handle errors here and show it to the user
 				if op, err := config.ParseFilterOp(m.Filters[i].inputs[1].Value()); err == nil {
 					m.Filters[i].Operator = op
 				}
@@ -273,7 +280,9 @@ func (m Model) View() string {
 	filterList := m.list.View()
 	selectionView := ""
 	if m.selected != nil {
-		selectionView = detailStyle.Height(m.list.Height()).Render(m.Filters[*m.selected].View())
+		selectionView = detailStyle.
+			Height(m.list.Height()).
+			Render(m.Filters[*m.selected].View())
 	}
 	return lipgloss.JoinHorizontal(lipgloss.Left, filterList, selectionView)
 }
@@ -295,7 +304,8 @@ func (m *Model) deselect() {
 }
 
 type itemDelegate struct {
-	keys []key.Binding
+	mainKeys []key.Binding
+	editKeys []key.Binding
 }
 
 func (d itemDelegate) Height() int                               { return 1 }
@@ -322,5 +332,5 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 
 	fmt.Fprint(w, fn(str))
 }
-func (d itemDelegate) ShortHelp() []key.Binding  { return d.keys }
-func (d itemDelegate) FullHelp() [][]key.Binding { return nil }
+func (d itemDelegate) ShortHelp() []key.Binding  { return d.mainKeys }
+func (d itemDelegate) FullHelp() [][]key.Binding { return [][]key.Binding{d.mainKeys} }
