@@ -239,7 +239,7 @@ func ColumnFromConfig(c config.Attribute) *Column {
 	return &Column{
 		title:       c.Name,
 		width:       c.Width,
-		valueGetter: valueFromSelector(c.Selectors, c.Type, c.Format),
+		valueGetter: valueGetterFromSelectors(c.Selectors, c.Type, c.Format),
 	}
 }
 
@@ -263,7 +263,30 @@ func identity(s string) string {
 	return s
 }
 
-func valueFromSelector(selectors []string, typ string, format *string) func(string) string {
+// valueGetterFromSelectors returns a function that can be used to get column values.
+//
+// For now it is useful for getting values from JSON data (including nested JSON data).
+//
+// Example:
+//
+//	valueGetterFromSelectors([]string{"json(data.barcode)"}, "", nil)
+//
+// The call above will return a function that can be called for each log file entry to retrieve
+// barcode information. It uses gjson to extract the value from JSON looking like
+// {"data": {"barcode": "1234", "whatever": 111}, "other_data": []}.
+//
+// If the extracted data is of a formattable type (e.g. time), the typ+format parameters can be
+// used to format the value. For now, only time is supported.
+//
+// In cases where you have nested data (say {"data": "{\"barcode\": \"1234\"}"}), you can use the
+// | character to pipe the result of one parsed json into another. For example:
+//
+//	valueGetterFromSelectors([]string{"json(data)|json(barcode)"}, "", nil)
+//
+// In cases where your log source has imperfectly structured data, you can use the fact that the
+// 'selectors' parameter is a slice. This means that you can provide multiple selectors and the
+// first one to yield a non-empty result is returned.
+func valueGetterFromSelectors(selectors []string, typ string, format *string) func(string) string {
 	getters := make([]func(string) string, len(selectors))
 	for i, selector := range selectors {
 		if selector == "." {
@@ -275,6 +298,8 @@ func valueFromSelector(selectors []string, typ string, format *string) func(stri
 			for _, sel := range partialSelectors {
 				sel = strings.TrimSpace(sel)
 				if strings.HasPrefix(sel, "json(") {
+					// set jsonPath to whatever is inside the parentheses of
+					// 'json(...)'
 					jsonPath := sel[5 : len(sel)-1]
 					if jsonPath == "." {
 						continue
