@@ -14,6 +14,16 @@ type Config struct {
 	activeView *LogView
 }
 
+// LogView represents a named view of a log source.
+//
+// A SourceId can be "file", [or in the future...] a database, a remote service like Logstash or
+// Loki etc.
+//
+// Some of these sources require additional options to be specified; Options can be used for that.
+//
+// Attributes are the columns that are shown in the view.
+//
+// Filters are used to filter which rows are shown.
 type LogView struct {
 	Name     string
 	SourceId string
@@ -40,6 +50,7 @@ func (lv LogView) GetRows() []string {
 	}
 }
 
+// global config 🤘
 var TheConfig *Config
 
 func Load() *Config {
