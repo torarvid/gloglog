@@ -21,13 +21,13 @@ type LogView struct {
 	Filters  []Filter
 }
 
-func (lv LogView) GetAttributeWithName(name string) *Attribute {
+func (lv LogView) GetAttributeWithName(name string) (*Attribute, error) {
 	for _, attr := range lv.Attrs {
 		if attr.Name == name {
-			return &attr
+			return &attr, nil
 		}
 	}
-	return nil
+	return nil, fmt.Errorf("no attribute with name %s", name)
 }
 
 func (lv LogView) GetRows() []string {

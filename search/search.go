@@ -195,7 +195,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 				if op, err := config.ParseFilterOp(m.Filters[i].inputs[1].Value()); err == nil {
 					m.Filters[i].Operator = op
 				}
-				if attr := m.logView.GetAttributeWithName(m.Filters[i].inputs[2].Value()); attr != nil {
+				if attr, err := m.logView.GetAttributeWithName(m.Filters[i].inputs[2].Value()); err == nil {
 					m.Filters[i].Attr = attr
 				}
 				m.deselect()
