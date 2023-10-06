@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path"
 
 	"github.com/pelletier/go-toml/v2"
 )
@@ -106,9 +107,7 @@ func getFilePath() string {
 			panic(err)
 		}
 	}
-	return fmt.Sprintf(
-		"%s%c%s%c%s", folder, os.PathSeparator, "gloglog", os.PathSeparator, "config.toml",
-	)
+	return path.Join(folder, "gloglog", "config.toml")
 }
 
 type Attribute struct {
