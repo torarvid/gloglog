@@ -298,6 +298,7 @@ func (m *Model[E]) SetColumns(cols []ColumnSpec[E]) {
 // SetRows set a new rows state.
 func (m *Model[E]) SetRows(r []E) {
 	m.rows = r
+	m.SetCursor(0)
 	m.UpdateViewport()
 }
 

@@ -195,7 +195,9 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.deselect()
 		case key.Matches(msg, m.keyMap.EditFilter):
 			if m.selected == nil {
-				m.selectFilter(m.list.Index())
+				if len(m.list.Items()) > 0 {
+					m.selectFilter(m.list.Index())
+				}
 				return m, nil
 			} else {
 				i := *m.selected
@@ -215,6 +217,20 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 			m.Filters = append(m.Filters, newFilter("", config.Contains, nil, ""))
 			m.list.SetItems(listItemsFromFilters(m.Filters))
 			m.selectFilter(len(m.Filters) - 1)
+		case key.Matches(msg, m.keyMap.DeleteFilter):
+			if len(m.list.Items()) == 0 {
+				return m, nil
+			}
+			n := m.list.Index()
+			m.Filters = append(m.Filters[:n], m.Filters[n+1:]...)
+			m.list.SetItems(listItemsFromFilters(m.Filters))
+			if len(m.Filters) == 0 {
+				m.deselect()
+			} else if len(m.Filters) > n {
+				m.selectFilter(n)
+			} else {
+				m.selectFilter(len(m.Filters) - 1)
+			}
 		}
 	}
 
@@ -279,7 +295,7 @@ func (m Model) UpdateFilters() tea.Cmd {
 func (m Model) View() string {
 	filterList := m.list.View()
 	selectionView := ""
-	if m.selected != nil {
+	if m.selected != nil && len(m.Filters) > *m.selected {
 		selectionView = detailStyle.
 			Height(m.list.Height()).
 			Render(m.Filters[*m.selected].View())
