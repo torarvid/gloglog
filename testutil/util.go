@@ -15,6 +15,7 @@ func TempEnv(key, value string) (reset func()) {
 
 func AssertEq[T comparable](t *testing.T, expected T, actual T) {
 	if expected != actual {
+		t.Helper()
 		t.Errorf("Expected %v, got %v", expected, actual)
 	}
 }
