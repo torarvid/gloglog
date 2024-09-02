@@ -28,7 +28,7 @@ func TestFilterSimple(t *testing.T) {
 	// filter for "hello" and "goodbye" should yield no rows
 	mainModel.SetFilters([]config.Filter{{Term: "hello"}, {Term: "goodbye"}})
 	if len(mainModel.filteredRows) != 0 {
-		t.Errorf("Expected 0 rows, got %d", len(mainModel.filteredRows))
+		t.Errorf("Expected 0 rows, got %d: %q", len(mainModel.filteredRows), mainModel.filteredRows)
 	}
 }
 
