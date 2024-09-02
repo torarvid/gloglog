@@ -24,14 +24,16 @@ func main() {
 	m := newModel(*view)
 	modelInitTime := time.Since(appStartTime) - cfgLoadTime
 	slog.Info("Model initialized in", "time", modelInitTime)
-	if err := tea.NewProgram(m, tea.WithAltScreen()).Start(); err != nil {
+	program := tea.NewProgram(m, tea.WithAltScreen())
+	_, err := program.Run()
+	if err != nil {
 		slog.Info("Error running program:", "error", err)
 		os.Exit(1)
 	}
 }
 
 func initLogger() {
-	f, err := os.OpenFile("log.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	f, err := os.OpenFile("log.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
 		slog.Error(err.Error())
 		panic(err)

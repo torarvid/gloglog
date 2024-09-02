@@ -9,6 +9,17 @@ import (
 	"github.com/pelletier/go-toml/v2"
 )
 
+type ConfigError string
+
+func (e ConfigError) Error() string {
+	return string(e)
+}
+
+var (
+	ErrNoAttrWithName  = ConfigError("no attribute with name")
+	ErrInvalidFilterOp = ConfigError("invalid filter op")
+)
+
 type Config struct {
 	SavedViews []*LogView
 	activeView *LogView
@@ -38,7 +49,7 @@ func (lv LogView) GetAttributeWithName(name string) (*Attribute, error) {
 			return &attr, nil
 		}
 	}
-	return nil, fmt.Errorf("no attribute with name %s", name)
+	return nil, fmt.Errorf("%w: %s", ErrNoAttrWithName, name)
 }
 
 func (lv LogView) GetRows() []string {
@@ -167,7 +178,7 @@ func ParseFilterOp(input string) (FilterOp, error) {
 	case "<=":
 		return LessThanOrEqual, nil
 	default:
-		return "", fmt.Errorf("invalid filter op: %s", input)
+		return "", fmt.Errorf("%w: %s", ErrInvalidFilterOp, input)
 	}
 }
 
