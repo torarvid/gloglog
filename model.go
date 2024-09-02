@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -32,6 +34,7 @@ type model struct {
 	table        table.Model[string]
 	schema       schema.Model
 	rows         []string
+	columns      []Column
 	filteredRows []string
 	view         config.LogView
 	filters      []RowFilter
@@ -153,11 +156,15 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *model) updateColumns(attrs []config.Attribute) {
-	columns := make([]table.ColumnSpec[string], len(attrs))
+	columns := make([]Column, len(attrs))
+	columnSpecs := make([]table.ColumnSpec[string], len(attrs))
 	for i, c := range attrs {
-		columns[i] = ColumnFromConfig(c)
+		column := ColumnFromConfig(c)
+		columns[i] = *column
+		columnSpecs[i] = column
 	}
-	m.table.SetColumns(columns)
+	m.columns = columns
+	m.table.SetColumns(columnSpecs)
 	view := config.TheConfig.GetActiveView()
 	view.Attrs = attrs
 	config.TheConfig.Save()
@@ -201,10 +208,99 @@ func (m model) View() string {
 
 func (m *model) SetFilters(filters []config.Filter) {
 	rowFilters := make([]RowFilter, len(filters))
+	valueGetterGetter := func(attr *string) func(string) string {
+		if attr == nil {
+			return identity
+		}
+		for _, columnSpec := range m.columns {
+			if columnSpec.Title() == *attr {
+				return columnSpec.GetValue
+			}
+		}
+		panic("no column with title " + *attr)
+	}
 	for i, filter := range filters {
-		filter := filter
-		rowFilter := func(row string) bool {
-			return strings.Contains(row, filter.Term)
+		valueGetter := valueGetterGetter(filter.Attr)
+		var rowFilter RowFilter
+		switch filter.Operator {
+		case config.Equal:
+			rowFilter = func(row string) bool {
+				return valueGetter(row) == filter.Term
+			}
+		case config.NotEqual:
+			rowFilter = func(row string) bool {
+				return valueGetter(row) != filter.Term
+			}
+		case config.RegexEqual:
+			re := regexp.MustCompile(filter.Term)
+			rowFilter = func(row string) bool {
+				return re.MatchString(valueGetter(row))
+			}
+		case config.RegexNotEqual:
+			re := regexp.MustCompile(filter.Term)
+			rowFilter = func(row string) bool {
+				return !re.MatchString(valueGetter(row))
+			}
+		case config.Contains:
+			rowFilter = func(row string) bool {
+				return strings.Contains(valueGetter(row), filter.Term)
+			}
+		case config.NotContains:
+			rowFilter = func(row string) bool {
+				return !strings.Contains(valueGetter(row), filter.Term)
+			}
+		case config.GreaterThan:
+			rowFilter = func(row string) bool {
+				rowValue, err := strconv.ParseFloat(valueGetter(row), 64)
+				if err != nil {
+					return false
+				}
+				filterValue, err := strconv.ParseFloat(filter.Term, 64)
+				if err != nil {
+					return false
+				}
+				return rowValue > filterValue
+			}
+		case config.LessThan:
+			rowFilter = func(row string) bool {
+				rowValue, err := strconv.ParseFloat(valueGetter(row), 64)
+				if err != nil {
+					return false
+				}
+				filterValue, err := strconv.ParseFloat(filter.Term, 64)
+				if err != nil {
+					return false
+				}
+				return rowValue < filterValue
+			}
+		case config.GreaterThanOrEqual:
+			rowFilter = func(row string) bool {
+				rowValue, err := strconv.ParseFloat(valueGetter(row), 64)
+				if err != nil {
+					return false
+				}
+				filterValue, err := strconv.ParseFloat(filter.Term, 64)
+				if err != nil {
+					return false
+				}
+				return rowValue >= filterValue
+			}
+		case config.LessThanOrEqual:
+			rowFilter = func(row string) bool {
+				rowValue, err := strconv.ParseFloat(valueGetter(row), 64)
+				if err != nil {
+					return false
+				}
+				filterValue, err := strconv.ParseFloat(filter.Term, 64)
+				if err != nil {
+					return false
+				}
+				return rowValue <= filterValue
+			}
+		default:
+			rowFilter = func(row string) bool {
+				return strings.Contains(row, filter.Term)
+			}
 		}
 		rowFilters[i] = rowFilter
 	}
@@ -235,11 +331,11 @@ type Column struct {
 	valueGetter func(string) string
 }
 
-func ColumnFromConfig(c config.Attribute) *Column {
+func ColumnFromConfig(attr config.Attribute) *Column {
 	return &Column{
-		title:       c.Name,
-		width:       c.Width,
-		valueGetter: valueGetterFromSelectors(c.Selectors, c.Type, c.Format),
+		title:       attr.Name,
+		width:       attr.Width,
+		valueGetter: valueGetterFromSelectors(attr.Selectors, attr.Type, attr.Format),
 	}
 }
 

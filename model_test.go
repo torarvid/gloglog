@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/torarvid/gloglog/config"
+	. "github.com/torarvid/gloglog/testutil"
 )
 
 func TestFilterSimple(t *testing.T) {
@@ -30,6 +31,41 @@ func TestFilterSimple(t *testing.T) {
 	if len(mainModel.filteredRows) != 0 {
 		t.Errorf("Expected 0 rows, got %d: %q", len(mainModel.filteredRows), mainModel.filteredRows)
 	}
+
+	// filter for "msg" should yield two rows (if only Term is specified)
+	mainModel.SetFilters([]config.Filter{{Term: "msg"}})
+	AssertEq(t, 2, len(mainModel.filteredRows))
+
+	// // filter for "msg" should yield no rows (if Term and Attr are specified)
+	// mainModel.SetFilters([]config.Filter{config.NewFilter("msg").WithAttr("msg")})
+	// AssertEq(t, 0, len(mainModel.filteredRows))
+}
+
+func TestFilter(t *testing.T) {
+	testRows := []string{
+		`{"level":"info","msg":"hello world","time":"2020-01-01T00:00:00Z"}`,
+		`{"level":"info","msg":"goodbye world","time":"2020-01-01T00:00:00Z"}`,
+	}
+	mainModel := model{rows: testRows}
+
+	// set columns on mainModel
+	mainModel.updateColumns([]config.Attribute{
+		{Name: "level", Width: 10, Selectors: []string{"json(level)"}},
+		{Name: "msg", Width: 10, Selectors: []string{"json(msg)"}},
+		{Name: "time", Width: 10, Selectors: []string{"json(time)"}},
+	})
+
+	// filter for "hello" should yield one row
+	mainModel.SetFilters([]config.Filter{config.NewFilter("hello").WithAttr("msg")})
+	AssertEq(t, 1, len(mainModel.filteredRows))
+
+	// filter for "hello" when attr is level should yield no rows
+	mainModel.SetFilters([]config.Filter{config.NewFilter("hello").WithOp(config.Contains).WithAttr("level")})
+	AssertEq(t, 0, len(mainModel.filteredRows))
+
+	// filter for 'not contains' "world" should yield no rows
+	mainModel.SetFilters([]config.Filter{config.NewFilter("world").WithOp(config.NotContains).WithAttr("msg")})
+	AssertEq(t, 0, len(mainModel.filteredRows))
 }
 
 func TestValueFromSelectors(t *testing.T) {

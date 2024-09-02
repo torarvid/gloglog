@@ -174,5 +174,31 @@ func ParseFilterOp(input string) (FilterOp, error) {
 type Filter struct {
 	Term     string
 	Operator FilterOp
-	Attr     *Attribute
+	Attr     *string
+}
+
+func NewFilter(term string) Filter {
+	return Filter{Term: term}
+}
+
+func (f Filter) WithOp(op FilterOp) Filter {
+	f.Operator = op
+	return f
+}
+
+func (f Filter) WithAttr(attr string) Filter {
+	f.Attr = &attr
+	return f
+}
+
+func (f Filter) String() string {
+	attr := "[anything]"
+	if f.Attr != nil {
+		attr = *f.Attr
+	}
+	op := "contains"
+	if f.Operator != "" {
+		op = string(f.Operator)
+	}
+	return fmt.Sprintf("'%s %s %s'", attr, op, f.Term)
 }

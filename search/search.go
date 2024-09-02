@@ -70,7 +70,7 @@ func DefaultKeyMap() KeyMap {
 type Filter struct {
 	Term     string
 	Operator config.FilterOp
-	Attr     *config.Attribute
+	Attr     *string
 	inputs   []textinput.Model
 }
 
@@ -97,7 +97,7 @@ type Model struct {
 func newFilter(
 	term string,
 	op config.FilterOp,
-	attr *config.Attribute,
+	attr *string,
 	attrPlaceholder string,
 ) Filter {
 	termInput := textinput.New()
@@ -117,7 +117,7 @@ func newFilter(
 	}
 	attrInput.Placeholder = attrPlaceholder
 	if attr != nil {
-		attrInput.SetValue(attr.Name)
+		attrInput.SetValue(*attr)
 	}
 	attrInput.Blur()
 
@@ -205,7 +205,7 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 					m.Filters[i].Operator = op
 				}
 				if attr, err := m.logView.GetAttributeWithName(m.Filters[i].inputs[2].Value()); err == nil {
-					m.Filters[i].Attr = attr
+					m.Filters[i].Attr = &attr.Name
 				}
 				m.deselect()
 				m.list.SetItems(listItemsFromFilters(m.Filters))
@@ -332,7 +332,7 @@ func (d itemDelegate) Render(w io.Writer, m list.Model, index int, listItem list
 
 	name := "[anything]"
 	if filter.Attr != nil {
-		name = filter.Attr.Name
+		name = *filter.Attr
 	}
 	str := fmt.Sprintf("%d. %s", index+1, name)
 
