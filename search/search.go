@@ -3,7 +3,6 @@ package search
 import (
 	"fmt"
 	"io"
-	"log/slog"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/key"
@@ -176,7 +175,6 @@ type Close struct{}
 
 func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 	cmds := make([]tea.Cmd, 0)
-	slog.Info("search update", "msg", msg)
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.list.SetSize(msg.Width-5, msg.Height-5)
@@ -236,7 +234,6 @@ func (m Model) Update(msg tea.Msg) (Model, tea.Cmd) {
 
 	var cmd tea.Cmd
 	m.list, cmd = m.list.Update(msg)
-	slog.Info("sucmd", "cmd", cmd)
 	cmds = append(cmds, cmd)
 	if m.selected != nil {
 		inputs := m.Filters[*m.selected].inputs
